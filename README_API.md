@@ -1,6 +1,6 @@
 # IST Chatbot Backend
 
-A FastAPI-based chatbot backend that provides AI-powered responses to questions about Instituto Superior Técnico (IST) using document retrieval and Google's Gemini AI model.
+A FastAPI-based chatbot backend that provides AI-powered responses to questions about Institute of Science and Technology (IST) using document retrieval and Google's Gemini AI model.
 
 ## Features
 
@@ -110,7 +110,7 @@ The server will start on `http://localhost:8001`
 **Response:**
 ```json
 {
-  "response": "Instituto Superior Técnico (IST) is...",
+  "response": "Institute of Science and Technology (IST) is...",
   "context_sources": ["ist-info-from-website.pdf"]
 }
 ```

@@ -9,7 +9,7 @@
     // Configuration
     const CONFIG = {
         apiUrl: 'http://localhost:8001/api/chat',
-        initialGreeting: 'Hello! I\'m the IST chatbot assistant. I\'m here to help you with questions about Instituto Superior Técnico. What would you like to know?',
+        initialGreeting: 'Hello! I\'m the IST chatbot assistant. I\'m here to help you with questions about Institute of Science and Technology. What would you like to know?',
         placeholderText: 'Ask me about IST...',
         errorMessage: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
         botName: 'IST Assistant',

@@ -102,9 +102,9 @@ def initialize_models():
     
     # Initialize generative model
     generative_model = GoogleGenerativeAI(
-        model="models/gemini-1.5-flash",
+        model="models/gemini-1.5-pro",
         google_api_key=google_api_key,
-        temperature=0.7
+        temperature=1
     )
     
     # Database configuration
@@ -184,7 +184,7 @@ def construct_prompt(user_message: str, context_documents: List[Dict[str, Any]])
             context_text += f"Document {i} (from {doc['filename']}):\n"
             context_text += f"{doc['content']}\n\n"
     
-    prompt = f"""You are an AI assistant for Instituto Superior Técnico (IST). Your role is to help students, faculty, and staff with questions about IST.
+    prompt = f"""You are an AI assistant for Institute of Science and Technology (IST) website. Your role is to help students, faculty, and staff with questions about IST.
 
 {context_text}
 

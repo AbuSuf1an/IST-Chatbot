@@ -2,7 +2,7 @@
 /**
  * Plugin Name: IST Chatbot
  * Plugin URI: https://github.com/AbuSuf1an/IST-Chatbot
- * Description: AI-powered chatbot widget for Instituto Superior Técnico that helps students, faculty, and staff with IST-related questions.
+ * Description: AI-powered chatbot widget for Institute of Science and Technology that helps students, faculty, and staff with IST-related questions.
  * Version: 1.0.0
  * Author: AbuSuf1an
  * Author URI: https://github.com/AbuSuf1an
@@ -354,7 +354,7 @@ register_activation_hook(__FILE__, function() {
     add_option('ist_chatbot_enabled', false);
     add_option('ist_chatbot_api_url', 'http://localhost:8001/api/chat');
     add_option('ist_chatbot_name', 'IST Assistant');
-    add_option('ist_chatbot_welcome', 'Hello! I\'m the IST chatbot assistant. I\'m here to help you with questions about Instituto Superior Técnico. What would you like to know?');
+    add_option('ist_chatbot_welcome', 'Hello! I\'m the IST chatbot assistant. I\'m here to help you with questions about Institute of Science and Technology. What would you like to know?');
 });
 
 // Deactivation hook
