@@ -15,6 +15,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import numpy as np
+from session_manager import SessionManager
+from datetime import datetime
 
 # LangChain imports
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
@@ -32,7 +34,18 @@ logger = logging.getLogger(__name__)
 # Global variables for models and database config
 embeddings_model = None
 generative_model = None
-db_config = None
+
+# Database configuration - define once and keep it global
+db_config = {
+    'host': os.getenv('DB_HOST', 'localhost'),
+    'port': os.getenv('DB_PORT', '5432'),
+    'database': os.getenv('DB_NAME', 'ist_data'),
+    'user': os.getenv('DB_USER', 'postgres'),
+    'password': os.getenv('DB_PASSWORD', '')
+}
+
+# Initialize session manager with db_config
+session_manager = SessionManager(db_config)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -75,19 +88,17 @@ app.add_middleware(
 # Pydantic models for request/response
 class ChatRequest(BaseModel):
     message: str
+    session_id: str = None
 
 class ChatResponse(BaseModel):
     response: str
     context_sources: List[str] = []
-
-# Global variables for models and database config
-embeddings_model = None
-generative_model = None
-db_config = None
+    session_id: str = None
+    timestamp: str = None
 
 def initialize_models():
-    """Initialize the AI models and database configuration."""
-    global embeddings_model, generative_model, db_config
+    """Initialize the AI models."""
+    global embeddings_model, generative_model
     
     # Get Google AI API key
     google_api_key = os.getenv('GOOGLE_API_KEY')
@@ -107,16 +118,7 @@ def initialize_models():
         temperature=1
     )
     
-    # Database configuration
-    db_config = {
-        'host': os.getenv('DB_HOST', 'localhost'),
-        'port': os.getenv('DB_PORT', '5432'),
-        'database': os.getenv('DB_NAME', 'ist_data'),
-        'user': os.getenv('DB_USER', 'postgres'),
-        'password': os.getenv('DB_PASSWORD', '')
-    }
-    
-    logger.info("Models and database configuration initialized successfully")
+    logger.info("Models initialized successfully")
 
 def get_embedding(text: str) -> List[float]:
     """Generate embedding for a given text."""
@@ -241,14 +243,48 @@ async def chat_endpoint(request: ChatRequest):
         
         logger.info(f"Received chat request: {user_message[:100]}...")
         
+        # Get or create session
+        session_id = request.session_id or session_manager.create_session()
+        
+        # Get conversation history for context
+        history = session_manager.get_session_history(session_id, limit=5)
+        
         # 1. Generate embedding for user message
         query_embedding = get_embedding(user_message)
         
         # 2. Search for similar documents
         similar_docs = search_similar_documents(query_embedding, top_k=3)
         
-        # 3. Construct prompt with context
-        prompt = construct_prompt(user_message, similar_docs)
+        # Build conversation history context
+        conversation_context = ""
+        if history:
+            conversation_context = "\n".join([
+                f"User: {h['user_message']}\nAssistant: {h['bot_response']}" 
+                for h in history[-3:]  # Last 3 exchanges
+            ])
+        
+        # 3. Construct prompt with context and conversation history
+        context_text = ""
+        if similar_docs:
+            context_text = "Here is some relevant context from IST documentation:\n\n"
+            for i, doc in enumerate(similar_docs, 1):
+                context_text += f"Document {i} (from {doc['filename']}):\n"
+                context_text += f"{doc['content']}\n\n"
+        
+        prompt = f"""You are an AI assistant for Institute of Science and Technology (IST) website. Your role is to help students, faculty, and staff with questions about IST.
+
+Previous conversation:
+{conversation_context}
+
+{context_text}
+
+Based on the context above and previous conversation, please answer the following question. If the context doesn't contain relevant information, you can still provide helpful information about IST based on your general knowledge, but mention that you're using general information.
+
+Question: {user_message}
+
+Please provide a helpful, accurate, and friendly response. If you're not sure about something specific to IST, it's better to say so rather than guess.
+
+Answer:"""
         
         # 4. Generate response using Gemini
         try:
@@ -260,11 +296,24 @@ async def chat_endpoint(request: ChatRequest):
         # 5. Extract source filenames for context
         context_sources = [doc['filename'] for doc in similar_docs] if similar_docs else []
         
-        logger.info(f"Generated response successfully. Context sources: {context_sources}")
+        # 6. Save the conversation to database
+        session_manager.save_conversation(
+            session_id=session_id,
+            user_message=user_message,
+            bot_response=ai_response,
+            metadata={
+                "sources": context_sources,
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+        logger.info(f"Generated response successfully. Session: {session_id}, Context sources: {context_sources}")
         
         return ChatResponse(
             response=ai_response,
-            context_sources=context_sources
+            context_sources=context_sources,
+            session_id=session_id,
+            timestamp=datetime.now().isoformat()
         )
         
     except HTTPException:
@@ -272,6 +321,59 @@ async def chat_endpoint(request: ChatRequest):
     except Exception as e:
         logger.error(f"Chat endpoint error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+# Add session management endpoints
+@app.delete("/chat/session/{session_id}")
+async def clear_session(session_id: str):
+    """Clear conversation history for a session."""
+    try:
+        session_manager.clear_session(session_id)
+        return {"message": "Session cleared successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/chat/session/{session_id}/history")
+async def get_session_history(session_id: str, limit: int = 10):
+    """Get conversation history for a session."""
+    try:
+        history = session_manager.get_session_history(session_id, limit)
+        return {"history": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/debug/sessions")
+async def get_all_sessions():
+    """Debug endpoint to see all chat sessions."""
+    try:
+        conn = psycopg2.connect(**db_config)
+        cur = conn.cursor()
+        
+        cur.execute("""
+            SELECT session_id, user_message, bot_response, created_at 
+            FROM chat_sessions 
+            ORDER BY created_at DESC 
+            LIMIT 50
+        """)
+        
+        results = cur.fetchall()
+        sessions = []
+        
+        for row in results:
+            sessions.append({
+                'session_id': row[0],
+                'user_message': row[1],
+                'bot_response': row[2],
+                'created_at': str(row[3])
+            })
+        
+        cur.close()
+        conn.close()
+        
+        return {"sessions": sessions, "total": len(sessions)}
+        
+    except Exception as e:
+        logger.error(f"Failed to get sessions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

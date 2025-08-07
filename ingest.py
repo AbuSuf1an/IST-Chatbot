@@ -73,6 +73,10 @@ class DocumentIngestor:
             # Enable pgvector extension
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
             
+            # Drop existing table if it exists
+            cur.execute("DROP TABLE IF EXISTS documents CASCADE;")
+            cur.execute("DROP TABLE IF EXISTS chat_sessions CASCADE;")
+            
             # Create documents table
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS documents (
@@ -86,6 +90,18 @@ class DocumentIngestor:
                 );
             """)
             
+            # Create chat sessions table for conversation history
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS chat_sessions (
+                    id SERIAL PRIMARY KEY,
+                    session_id VARCHAR(255) UNIQUE NOT NULL,
+                    user_message TEXT NOT NULL,
+                    bot_response TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    metadata JSONB
+                );
+            """)
+            
             # Create index on embedding column for faster similarity search
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS documents_embedding_idx 
@@ -93,14 +109,43 @@ class DocumentIngestor:
                 WITH (lists = 100);
             """)
             
+            # Create index on session_id for faster session queries
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS chat_sessions_session_id_idx 
+                ON chat_sessions (session_id);
+            """)
+            
+            # Create index on created_at for chronological ordering
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS chat_sessions_created_at_idx 
+                ON chat_sessions (created_at);
+            """)
+            
+            # Create additional indexes for better query performance
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS documents_filename_idx 
+                ON documents (filename);
+            """)
+            
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS documents_created_at_idx 
+                ON documents (created_at);
+            """)
+            
+            # Create index on metadata for JSONB queries
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS documents_metadata_idx 
+                ON documents USING GIN (metadata);
+            """)
+            
             conn.commit()
             cur.close()
             conn.close()
             
-            logger.info("Database setup completed successfully")
+            logger.info("Database table and indexes created successfully")
             
         except Exception as e:
-            logger.error(f"Database setup failed: {str(e)}")
+            logger.error(f"Database table creation failed: {str(e)}")
             raise
     
     def load_documents(self) -> List[Any]:
@@ -216,10 +261,33 @@ class DocumentIngestor:
             logger.error(f"Failed to clear existing data: {str(e)}")
             raise
     
+    def drop_existing_table(self):
+        """Drop the documents table if it exists."""
+        try:
+            conn = psycopg2.connect(**self.db_config)
+            cur = conn.cursor()
+            
+            # Drop the documents table if it exists
+            cur.execute("DROP TABLE IF EXISTS documents CASCADE;")
+            
+            conn.commit()
+            cur.close()
+            conn.close()
+            
+            logger.info("Existing documents table dropped successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to drop existing table: {str(e)}")
+            raise
+    
     def ingest_documents(self, clear_existing: bool = False):
         """Main method to orchestrate the document ingestion process."""
         try:
             logger.info("Starting document ingestion process...")
+            
+            # Drop existing table if requested
+            if clear_existing:
+                self.drop_existing_table()
             
             # Setup database
             self.setup_database()
