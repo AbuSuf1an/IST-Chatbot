@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IST Chatbot Widget Demo</title>
+    <link rel="stylesheet" href="assets/css/chatbot.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        .demo-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .demo-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .demo-header h1 {
+            color: #007cba;
+            margin-bottom: 10px;
+        }
+        
+        .demo-header p {
+            color: #666;
+            font-size: 18px;
+        }
+        
+        .demo-content {
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .demo-content h2 {
+            color: #005a87;
+            margin-top: 30px;
+        }
+        
+        .features-list {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .features-list ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .features-list li {
+            margin-bottom: 8px;
+        }
+        
+        .chatbot-notice {
+            background: linear-gradient(135deg, #007cba, #005a87);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        .chatbot-notice h3 {
+            margin: 0 0 10px 0;
+        }
+        
+        .api-status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .api-status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .api-status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>🎓 IST Chatbot Widget Demo</h1>
+            <p>Interactive AI assistant for Instituto Superior Técnico</p>
+            <div id="api-status" class="api-status">
+                <span>Checking API connection...</span>
+            </div>
+        </div>
+        
+        <div class="demo-content">
+            <h2>About the IST Chatbot</h2>
+            <p>
+                This chatbot widget provides instant assistance to students, faculty, and staff of 
+                Instituto Superior Técnico. It uses advanced AI to answer questions about courses, 
+                admissions, campus facilities, and other IST-related topics.
+            </p>
+            
+            <div class="features-list">
+                <h3>Key Features:</h3>
+                <ul>
+                    <li>✨ Contextual responses based on IST documentation</li>
+                    <li>🔍 Semantic search through IST knowledge base</li>
+                    <li>💬 Natural language conversation interface</li>
+                    <li>📱 Responsive design for all devices</li>
+                    <li>🎯 Source attribution for transparency</li>
+                    <li>⚡ Fast response times</li>
+                </ul>
+            </div>
+            
+            <h2>How to Use</h2>
+            <p>
+                Click the chatbot button in the bottom-right corner to start a conversation. 
+                You can ask questions like:
+            </p>
+            <ul>
+                <li>"What is IST?"</li>
+                <li>"What courses does IST offer?"</li>
+                <li>"How do I apply to IST?"</li>
+                <li>"Tell me about IST facilities"</li>
+                <li>"What are the admission requirements?"</li>
+            </ul>
+            
+            <div class="chatbot-notice">
+                <h3>🚀 Try the Chatbot Now!</h3>
+                <p>Look for the chatbot button in the bottom-right corner of your screen</p>
+            </div>
+            
+            <h2>Technical Implementation</h2>
+            <p>
+                The chatbot is powered by Google's Gemini AI model and uses a PostgreSQL database 
+                with vector embeddings for semantic search. It's implemented as a FastAPI backend 
+                with a JavaScript frontend widget that can be easily integrated into any website.
+            </p>
+        </div>
+    </div>
+
+    <!-- Chatbot JavaScript -->
+    <script src="assets/js/chatbot.js"></script>
+    
+    <!-- API Status Check Script -->
+    <script>
+        async function checkAPIStatus() {
+            const statusElement = document.getElementById('api-status');
+            
+            try {
+                const response = await fetch('http://localhost:8001/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    statusElement.className = 'api-status connected';
+                    statusElement.innerHTML = `
+                        <strong>✅ API Connected</strong><br>
+                        Status: ${data.status} | Documents: ${data.documents_count}
+                    `;
+                } else {
+                    throw new Error('API responded with error');
+                }
+            } catch (error) {
+                statusElement.className = 'api-status disconnected';
+                statusElement.innerHTML = `
+                    <strong>❌ API Disconnected</strong><br>
+                    Make sure the FastAPI server is running on port 8001
+                `;
+            }
+        }
+        
+        // Check API status on page load
+        checkAPIStatus();
+        
+        // Check API status every 30 seconds
+        setInterval(checkAPIStatus, 30000);
+    </script>
+</body>
+</html>
