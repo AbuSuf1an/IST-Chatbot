@@ -17,7 +17,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime 
 import hashlib
 
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
@@ -407,6 +407,55 @@ def rephrase_query(user_message: str, chat_history: List[Dict[str, str]]) -> str
     Now prioritizes most recent conversation context over older exchanges.
     """
     try:
+        # Check if the message is a greeting - don't rephrase greetings
+        greeting_words = [
+            'hi', 'hello', 'hey', 'hola', 'howdy',
+            'good morning', 'good afternoon', 'good evening', 'good night',
+            'assalamu alaikum', 'walaikum assalam', 'salam', 'salaam',
+            'thanks', 'thank you', 'thanks a lot', 'thank you so much', 
+            'bye', 'goodbye', 'see you', 'take care', 'farewell',
+            'nice to meet you', 'pleasure to meet you',
+            'how are you', 'how do you do', 'what\'s up', 'whats up'
+        ]
+        
+        # Additional greeting patterns
+        greeting_patterns = [
+            'good day', 'good to see you', 'nice talking to you',
+            'have a good day', 'have a great day', 'have a nice day'
+        ]
+        
+        user_message_lower = user_message.lower().strip()
+        
+        # Check for exact matches in greeting words
+        if user_message_lower in greeting_words:
+            logger.debug(f"Detected exact greeting: '{user_message}' - skipping rephrasing")
+            return user_message
+        
+        # Check for greeting patterns (partial matches)
+        for pattern in greeting_patterns:
+            if pattern in user_message_lower:
+                logger.debug(f"Detected greeting pattern '{pattern}' in message: '{user_message}' - skipping rephrasing")
+                return user_message
+        
+        # Check if it's a short phrase containing greeting words (2-4 words)
+        message_words = user_message.strip().split()
+        if len(message_words) <= 4:
+            for greeting in greeting_words:
+                if greeting in user_message_lower:
+                    logger.debug(f"Detected greeting in short phrase: '{user_message}' - skipping rephrasing")
+                    return user_message
+        
+        # Check for common greeting-like expressions
+        greeting_expressions = [
+            'peace be upon you', 'peace be with you', 'blessings',
+            'hope you are well', 'hope all is well'
+        ]
+        
+        for expression in greeting_expressions:
+            if expression in user_message_lower:
+                logger.debug(f"Detected greeting expression: '{user_message}' - skipping rephrasing")
+                return user_message
+        
         # If no history, return original message
         if not chat_history:
             logger.debug("No chat history available for query rephrasing")
