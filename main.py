@@ -316,30 +316,36 @@ def search_similar_documents(query_embedding: List[float], top_k: int = 5, min_s
 def construct_prompt(user_message: str, context_documents: List[Dict[str, Any]], chat_history: List[Dict[str, str]] = None) -> str:
     """
     Construct a prompt for the generative model using user message, context, and chat history.
-    Now incorporates session-based conversation history for better context understanding.
+    Now prioritizes recent context over older contradictory information.
     """
     
-    # Build conversation memory section
+    # Build conversation memory section with recency bias
     conversation_context = ""
     if chat_history:
         # Limit history to last 5 exchanges for token management
         recent_history = chat_history[-5:] if len(chat_history) > 5 else chat_history
         
         if recent_history:
-            conversation_context = "CONVERSATION CONTEXT:\n"
-            conversation_context += "Recent discussion from this session:\n\n"
+            conversation_context = "CONVERSATION MEMORY:\n"
+            conversation_context += "Recent discussion context (prioritize most recent information):\n\n"
             
-            for i, exchange in enumerate(recent_history, 1):
+            # Reverse the order to show most recent first, with emphasis
+            for i, exchange in enumerate(reversed(recent_history), 1):
                 user_msg = exchange.get('user', exchange.get('message', ''))
                 bot_msg = exchange.get('bot', exchange.get('response', ''))
                 
+                # Calculate actual position (1 = most recent, 5 = oldest)
+                actual_position = len(recent_history) - i + 1
+                
                 if user_msg:
-                    # Truncate long messages to manage token usage
                     user_summary = user_msg if len(user_msg) <= 100 else user_msg[:97] + "..."
-                    conversation_context += f"{i}. User: {user_summary}\n"
+                    # Mark most recent exchanges with emphasis
+                    if i <= 2:  # Most recent 2 exchanges get priority
+                        conversation_context += f"RECENT {actual_position}. User: {user_summary}\n"
+                    else:
+                        conversation_context += f"Earlier {actual_position}. User: {user_summary}\n"
                 
                 if bot_msg:
-                    # Extract key information from bot response
                     sentences = bot_msg.split('. ')
                     if len(sentences) >= 1 and len(sentences[0]) > 0:
                         bot_summary = sentences[0] + '.'
@@ -348,7 +354,10 @@ def construct_prompt(user_message: str, context_documents: List[Dict[str, Any]],
                     else:
                         bot_summary = bot_msg[:120] + "..." if len(bot_msg) > 120 else bot_msg
                     
-                    conversation_context += f"   Bot: {bot_summary}\n"
+                    if i <= 2:  # Most recent 2 exchanges get priority
+                        conversation_context += f"RECENT Bot: {bot_summary}\n"
+                    else:
+                        conversation_context += f"Earlier Bot: {bot_summary}\n"
             
             conversation_context += "\n"
     
@@ -363,24 +372,28 @@ def construct_prompt(user_message: str, context_documents: List[Dict[str, Any]],
             context_text += f"Document {i} (from {doc['filename']}, relevance: {similarity_score:.2f}):\n"
             context_text += f"{doc['content']}\n\n"
     
-    # Construct the complete prompt with explicit instructions to avoid greetings
+    # Enhanced prompt with recency prioritization
     prompt = f"""PRIORITY INSTRUCTIONS - FOLLOW THESE RULES STRICTLY:
 1. Adopt a friendly and helpful tone, similar to a university academic advisor.
 2. Be conversational and avoid overly formal language.
-3. When "IST" is mentioned, it ALWAYS refers to "Institute of Science and Technology, Dhaka."
-4. Use BOTH conversation context and retrieved documentation to provide comprehensive answers.
-5. Answer questions using information found in the provided context.
-6. If the answer cannot be found in the provided context, respond with: "I don't have that specific information in my current knowledge base."
-7. Use conversation context to understand follow-up questions and maintain continuity.
-8. Keep responses concise and to the point.
-9. Do NOT ask for clarification about acronyms - assume IST means Institute of Science and Technology, Dhaka.
-10. Do NOT start your response with greetings like "Hi", "Hello", "Hey" or similar words.
-11. Start directly with the answer to the question - no introductory pleasantries needed.
-12. This is a continuing conversation, so respond naturally without repetitive greetings.
+3. Start the response with the most relevant information available.
+4. Avoid using phrases like "According to the documents," "The provided information," or "This question cannot be answered definitively."
+5. If information is not fully detailed, gently state what is available and what is missing.
+6. Keep responses concise and to the point.
+7. When "IST" is mentioned, it ALWAYS refers to "Institute of Science and Technology, Dhaka."
+8. Use BOTH conversation memory and retrieved documentation to provide comprehensive answers.
+9. If the answer cannot be found in either source, respond with: "I don't have that specific information in my current knowledge base."
+10. Do NOT ask for clarification about acronyms - assume IST means Institute of Science and Technology, Dhaka.
+11. Use conversation context to understand follow-up questions and maintain continuity.
+12. **CRITICAL: When there's conflicting information in conversation history, ALWAYS prioritize the MOST RECENT context over older information.**
+13. **CRITICAL: If the user switches topics (e.g., from CSE to EEE), follow-up questions should relate to the MOST RECENT topic discussed.**
+14. Do NOT start your response with greetings like "Hi", "Hello", "Hey" or similar words.
+15. Start directly with the answer to the question - no introductory pleasantries needed.
+16. This is a continuing conversation, so respond naturally without repetitive greetings.
 
 You are a friendly AI assistant for Institute of Science and Technology (IST), Dhaka. Act like a helpful university academic advisor who is already engaged in conversation.
 
-{conversation_context}{context_text}Based on the conversation context and retrieved documentation above, please answer the following question directly without any greeting words:
+{conversation_context}{context_text}Based on the conversation memory and retrieved documentation above, please answer the following question. **Pay special attention to RECENT exchanges in the conversation memory as they represent the current context:**
 
 Question: {user_message}
 
@@ -391,7 +404,7 @@ Answer:"""
 def rephrase_query(user_message: str, chat_history: List[Dict[str, str]]) -> str:
     """
     Rephrase the user's query to be more specific using chat history and IST context.
-    Now uses session-based conversation history for better context understanding.
+    Now prioritizes most recent conversation context over older exchanges.
     """
     try:
         # If no history, return original message
@@ -399,13 +412,14 @@ def rephrase_query(user_message: str, chat_history: List[Dict[str, str]]) -> str
             logger.debug("No chat history available for query rephrasing")
             return user_message
         
-        # Build chat history context from session memory
+        # Build chat history context from session memory - prioritize recent exchanges
         history_context = ""
         recent_history = chat_history[-3:] if len(chat_history) > 3 else chat_history  # Last 3 exchanges
         
         if recent_history:
-            history_context = "Previous conversation:\n"
-            for i, exchange in enumerate(recent_history, 1):
+            history_context = "Previous conversation (most recent first):\n"
+            # Reverse to show most recent first
+            for i, exchange in enumerate(reversed(recent_history), 1):
                 user_msg = exchange.get('user', exchange.get('message', ''))
                 bot_msg = exchange.get('bot', exchange.get('response', ''))
                 
@@ -413,7 +427,12 @@ def rephrase_query(user_message: str, chat_history: List[Dict[str, str]]) -> str
                     # Truncate for context efficiency
                     user_summary = user_msg if len(user_msg) <= 80 else user_msg[:77] + "..."
                     bot_summary = bot_msg.split('.')[0] + '.' if '.' in bot_msg else bot_msg[:100] + "..."
-                    history_context += f"{i}. User: {user_summary}\n   Bot: {bot_summary}\n"
+                    
+                    # Mark the most recent exchange
+                    if i == 1:
+                        history_context += f"MOST RECENT - User: {user_summary}\n   Bot: {bot_summary}\n"
+                    else:
+                        history_context += f"Earlier {i} - User: {user_summary}\n   Bot: {bot_summary}\n"
             history_context += "\n"
         
         if not history_context:
@@ -426,13 +445,24 @@ def rephrase_query(user_message: str, chat_history: List[Dict[str, str]]) -> str
 Instructions:
 - If the question mentions "IST" or refers to "the institution/organization/university", assume it's about Institute of Science and Technology, Dhaka
 - Make the question more specific by adding context from the conversation history
-- If the question is vague (like "tell me more", "what about admission", "how much does it cost"), add specific context
+- **PRIORITIZE the MOST RECENT exchange when determining context - if there are conflicting topics, use the most recent one**
+- If the question is vague (like "tell me more", "what about admission", "how much does it cost"), add specific context from the MOST RECENT topic
 - Your output should ONLY be the rephrased question, nothing else
 - If the question is already specific and clear, you may return it unchanged
 
 Rephrased question:"""
         
         rephrased = generative_model.invoke(rephrase_prompt).strip()
+        
+        # Clean up the response
+        lines = rephrased.split('\n')
+        rephrased = lines[0].strip()
+        
+        # Remove any quotes
+        if rephrased.startswith('"') and rephrased.endswith('"'):
+            rephrased = rephrased[1:-1]
+        if rephrased.startswith("'") and rephrased.endswith("'"):
+            rephrased = rephrased[1:-1]
         
         # Log the rephrasing for debugging
         logger.info(f"Original query: {user_message}")
