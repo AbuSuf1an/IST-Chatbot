@@ -1,31 +1,28 @@
 class ChatBot {
     constructor() {
-        this.sessionId = localStorage.getItem('chatbot_session_id');
         this.conversationHistory = [];
+        this.apiUrl = 'http://localhost:8001/api/chat';
     }
     
     async sendMessage(message) {
         try {
-            const response = await fetch('/chat', {
+            const response = await fetch(this.apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    message: message,
-                    session_id: this.sessionId
+                    message: message
                 })
             });
             
-            const data = await response.json();
-            
-            // Store session ID
-            if (data.session_id) {
-                this.sessionId = data.session_id;
-                localStorage.setItem('chatbot_session_id', this.sessionId);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
             
-            // Update conversation history
+            const data = await response.json();
+            
+            // Store in local conversation history (optional)
             this.conversationHistory.push({
                 user: message,
                 bot: data.response,
@@ -40,15 +37,20 @@ class ChatBot {
         }
     }
     
-    async clearSession() {
-        if (this.sessionId) {
-            await fetch(`/chat/session/${this.sessionId}`, {
-                method: 'DELETE'
-            });
-            
-            localStorage.removeItem('chatbot_session_id');
-            this.sessionId = null;
-            this.conversationHistory = [];
-        }
+    clearLocalHistory() {
+        this.conversationHistory = [];
+        console.log('Local conversation history cleared');
+    }
+    
+    getLocalHistory() {
+        return this.conversationHistory;
     }
 }
+
+// Initialize chatbot
+const chatbot = new ChatBot();
+
+// Optional: Clear local history when page is refreshed
+window.addEventListener('beforeunload', () => {
+    chatbot.clearLocalHistory();
+});

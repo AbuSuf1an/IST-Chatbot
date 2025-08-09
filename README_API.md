@@ -55,7 +55,7 @@ DB_USER=postgres
 DB_PASSWORD=your_db_password
 
 # Google AI API Key
-GOOGLE_API_KEY=your_google_api_key
+gemini_api_key=your_gemini_api_key
 ```
 
 ### 4. Database Setup
@@ -202,7 +202,7 @@ ist-chatbot/
    - Download NLTK data as shown in setup
 
 3. **Gemini API Error**
-   - Verify `GOOGLE_API_KEY` is correct
+   - Verify `gemini_api_key` is correct
    - Check API quotas and limits
 
 4. **CORS Issues**

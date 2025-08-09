@@ -15,27 +15,21 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import numpy as np
-from session_manager import SessionManager
 from datetime import datetime
 
-# LangChain imports
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
 
-# Load environment variables
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Global variables for models and database config
 embeddings_model = None
 generative_model = None
 
-# Database configuration - define once and keep it global
 db_config = {
     'host': os.getenv('DB_HOST', 'localhost'),
     'port': os.getenv('DB_PORT', '5432'),
@@ -44,12 +38,8 @@ db_config = {
     'password': os.getenv('DB_PASSWORD', '')
 }
 
-# Initialize session manager with db_config
-session_manager = SessionManager(db_config)
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize models and database connection on startup."""
     try:
         initialize_models()
         
@@ -79,49 +69,45 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this to your WordPress domain in production
+    allow_origins=["*"],  # Have to configure this to your WordPress domain in production
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-# Pydantic models for request/response
 class ChatRequest(BaseModel):
     message: str
-    session_id: str = None
+    history: List[Dict[str, str]] = []
 
 class ChatResponse(BaseModel):
     response: str
     context_sources: List[str] = []
-    session_id: str = None
     timestamp: str = None
 
 def initialize_models():
-    """Initialize the AI models."""
     global embeddings_model, generative_model
     
-    # Get Google AI API key
-    google_api_key = os.getenv('GOOGLE_API_KEY')
-    if not google_api_key:
-        raise ValueError("GOOGLE_API_KEY environment variable is required")
-    
+    # Get Gemini API key
+    gemini_api_key = os.getenv('GEMINI_API_KEY')
+    if not gemini_api_key:
+        raise ValueError("GEMINI_API_KEY environment variable is required")
+
     # Initialize embeddings model
     embeddings_model = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001",
-        google_api_key=google_api_key
+        google_api_key=gemini_api_key
     )
     
     # Initialize generative model
     generative_model = GoogleGenerativeAI(
         model="models/gemini-1.5-pro",
-        google_api_key=google_api_key,
-        temperature=1
+        google_api_key=gemini_api_key,
+        temperature=1,
     )
     
     logger.info("Models initialized successfully")
 
 def get_embedding(text: str) -> List[float]:
-    """Generate embedding for a given text."""
     try:
         embedding = embeddings_model.embed_query(text)
         return embedding
@@ -129,7 +115,7 @@ def get_embedding(text: str) -> List[float]:
         logger.error(f"Failed to generate embedding: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to generate embedding")
 
-def search_similar_documents(query_embedding: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
+def search_similar_documents(query_embedding: List[float], top_k: int = 5, min_similarity: float = 0.75) -> List[Dict[str, Any]]:
     """Search for similar documents in the database using cosine similarity."""
     try:
         conn = psycopg2.connect(**db_config)
@@ -138,21 +124,23 @@ def search_similar_documents(query_embedding: List[float], top_k: int = 3) -> Li
         # Convert embedding to string format for PostgreSQL
         embedding_str = '[' + ','.join(map(str, query_embedding)) + ']'
         
-        # Perform similarity search using cosine similarity
+        # Perform similarity search using cosine similarity with minimum similarity filter
         query = """
         SELECT filename, content, metadata, 
-               (embedding <=> %s::vector) as distance
+               (embedding <=> %s::vector) as distance,
+               (1 - (embedding <=> %s::vector)) as similarity
         FROM documents
+        WHERE (1 - (embedding <=> %s::vector)) >= %s
         ORDER BY embedding <=> %s::vector
         LIMIT %s;
         """
         
-        cur.execute(query, (embedding_str, embedding_str, top_k))
+        cur.execute(query, (embedding_str, embedding_str, embedding_str, min_similarity, embedding_str, top_k))
         results = cur.fetchall()
         
         documents = []
         for row in results:
-            filename, content, metadata, distance = row
+            filename, content, metadata, distance, similarity = row
             # Parse metadata JSON
             try:
                 metadata_dict = json.loads(metadata) if metadata else {}
@@ -163,13 +151,13 @@ def search_similar_documents(query_embedding: List[float], top_k: int = 3) -> Li
                 'filename': filename,
                 'content': content,
                 'metadata': metadata_dict,
-                'similarity_score': 1 - distance  # Convert distance to similarity
+                'similarity_score': similarity  # Use the calculated similarity score
             })
         
         cur.close()
         conn.close()
         
-        logger.info(f"Found {len(documents)} similar documents")
+        logger.info(f"Found {len(documents)} similar documents (min_similarity: {min_similarity})")
         return documents
         
     except Exception as e:
@@ -186,15 +174,21 @@ def construct_prompt(user_message: str, context_documents: List[Dict[str, Any]])
             context_text += f"Document {i} (from {doc['filename']}):\n"
             context_text += f"{doc['content']}\n\n"
     
-    prompt = f"""You are an AI assistant for Institute of Science and Technology (IST) website. Your role is to help students, faculty, and staff with questions about IST.
+    prompt = f"""PRIORITY INSTRUCTIONS - FOLLOW THESE RULES STRICTLY:
+1. When "IST" is mentioned, it ALWAYS refers to "Institute of Science and Technology, Dhaka" from the provided documents.
+2. Answer questions ONLY using information found in the provided context below.
+3. If the answer cannot be found in the provided context, respond with: "The information you are looking for is not available in our documents."
+4. Do NOT use your general knowledge or ask for clarification about acronyms.
+5. Do NOT ask which "IST" the user is referring to - assume it's always Institute of Science and Technology, Dhaka.
+6. The user question may be contextually enhanced based on conversation history - answer it as presented.
+
+You are an AI assistant for Institute of Science and Technology (IST), Dhaka. Your role is to help students, faculty, and staff with questions about IST using only the provided documentation.
 
 {context_text}
 
-Based on the context above (if provided) and your knowledge about IST, please answer the following question. If the context doesn't contain relevant information, you can still provide helpful information about IST based on your general knowledge, but mention that you're using general information.
+Based strictly on the context above, please answer the following question. Remember: if the information is not in the provided context, say "The information you are looking for is not available in our documents."
 
 Question: {user_message}
-
-Please provide a helpful, accurate, and friendly response. If you're not sure about something specific to IST, it's better to say so rather than guess.
 
 Answer:"""
     
@@ -232,9 +226,6 @@ async def health_check():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
-    """
-    Main chat endpoint that processes user messages and returns AI responses.
-    """
     try:
         user_message = request.message.strip()
         
@@ -243,76 +234,30 @@ async def chat_endpoint(request: ChatRequest):
         
         logger.info(f"Received chat request: {user_message[:100]}...")
         
-        # Get or create session
-        session_id = request.session_id or session_manager.create_session()
+        # Rephrase the query to be more specific using chat history
+        rephrased_query = rephrase_query(user_message, request.history)
         
-        # Get conversation history for context
-        history = session_manager.get_session_history(session_id, limit=5)
+        # Use the rephrased query for embedding generation
+        query_embedding = get_embedding(rephrased_query)
         
-        # 1. Generate embedding for user message
-        query_embedding = get_embedding(user_message)
+        similar_docs = search_similar_documents(query_embedding, top_k=7, min_similarity=0.6)
         
-        # 2. Search for similar documents
-        similar_docs = search_similar_documents(query_embedding, top_k=3)
+        # Use the rephrased query (not original message) for better context understanding
+        prompt = construct_prompt(rephrased_query, similar_docs)
         
-        # Build conversation history context
-        conversation_context = ""
-        if history:
-            conversation_context = "\n".join([
-                f"User: {h['user_message']}\nAssistant: {h['bot_response']}" 
-                for h in history[-3:]  # Last 3 exchanges
-            ])
-        
-        # 3. Construct prompt with context and conversation history
-        context_text = ""
-        if similar_docs:
-            context_text = "Here is some relevant context from IST documentation:\n\n"
-            for i, doc in enumerate(similar_docs, 1):
-                context_text += f"Document {i} (from {doc['filename']}):\n"
-                context_text += f"{doc['content']}\n\n"
-        
-        prompt = f"""You are an AI assistant for Institute of Science and Technology (IST) website. Your role is to help students, faculty, and staff with questions about IST.
-
-Previous conversation:
-{conversation_context}
-
-{context_text}
-
-Based on the context above and previous conversation, please answer the following question. If the context doesn't contain relevant information, you can still provide helpful information about IST based on your general knowledge, but mention that you're using general information.
-
-Question: {user_message}
-
-Please provide a helpful, accurate, and friendly response. If you're not sure about something specific to IST, it's better to say so rather than guess.
-
-Answer:"""
-        
-        # 4. Generate response using Gemini
         try:
             ai_response = generative_model.invoke(prompt)
         except Exception as e:
             logger.error(f"Gemini API call failed: {str(e)}")
             raise HTTPException(status_code=500, detail="Failed to generate AI response")
         
-        # 5. Extract source filenames for context
         context_sources = [doc['filename'] for doc in similar_docs] if similar_docs else []
         
-        # 6. Save the conversation to database
-        session_manager.save_conversation(
-            session_id=session_id,
-            user_message=user_message,
-            bot_response=ai_response,
-            metadata={
-                "sources": context_sources,
-                "timestamp": datetime.now().isoformat()
-            }
-        )
-        
-        logger.info(f"Generated response successfully. Session: {session_id}, Context sources: {context_sources}")
+        logger.info(f"Generated response successfully. Context sources: {context_sources}")
         
         return ChatResponse(
             response=ai_response,
             context_sources=context_sources,
-            session_id=session_id,
             timestamp=datetime.now().isoformat()
         )
         
@@ -322,58 +267,43 @@ Answer:"""
         logger.error(f"Chat endpoint error: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-# Add session management endpoints
-@app.delete("/chat/session/{session_id}")
-async def clear_session(session_id: str):
-    """Clear conversation history for a session."""
+def rephrase_query(user_message: str, chat_history: List[Dict[str, str]]) -> str:
+    """Rephrase the user's query to be more specific using chat history and IST context."""
     try:
-        session_manager.clear_session(session_id)
-        return {"message": "Session cleared successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Build chat history context
+        history_context = ""
+        if chat_history:
+            history_context = "Previous conversation:\n"
+            for i, exchange in enumerate(chat_history[-3:], 1):  # Only use last 3 exchanges
+                user_msg = exchange.get('user', exchange.get('message', ''))
+                bot_msg = exchange.get('bot', exchange.get('response', ''))
+                history_context += f"{i}. User: {user_msg}\n   Bot: {bot_msg}\n"
+            history_context += "\n"
+        
+        rephrase_prompt = f"""Given the chat history below and knowing that this chatbot is specifically about the Institute of Science and Technology (IST), Dhaka, please rephrase the user's current question to be more specific and contextual.
 
-@app.get("/chat/session/{session_id}/history")
-async def get_session_history(session_id: str, limit: int = 10):
-    """Get conversation history for a session."""
-    try:
-        history = session_manager.get_session_history(session_id, limit)
-        return {"history": history}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+{history_context}Current user question: {user_message}
 
-@app.get("/debug/sessions")
-async def get_all_sessions():
-    """Debug endpoint to see all chat sessions."""
-    try:
-        conn = psycopg2.connect(**db_config)
-        cur = conn.cursor()
+Instructions:
+- If the question mentions "IST" or refers to "the institution/organization/university", assume it's about Institute of Science and Technology, Dhaka
+- Make the question more specific by adding context from the conversation history
+- If the question is vague (like "tell me more", "what about admission", "how much does it cost"), add specific context
+- Your output should ONLY be the rephrased question, nothing else
+- If the question is already specific and clear, you may return it unchanged
+
+Rephrased question:"""
         
-        cur.execute("""
-            SELECT session_id, user_message, bot_response, created_at 
-            FROM chat_sessions 
-            ORDER BY created_at DESC 
-            LIMIT 50
-        """)
+        rephrased = generative_model.invoke(rephrase_prompt).strip()
         
-        results = cur.fetchall()
-        sessions = []
+        # Log the rephrasing for debugging
+        logger.info(f"Original query: {user_message}")
+        logger.info(f"Rephrased query: {rephrased}")
         
-        for row in results:
-            sessions.append({
-                'session_id': row[0],
-                'user_message': row[1],
-                'bot_response': row[2],
-                'created_at': str(row[3])
-            })
-        
-        cur.close()
-        conn.close()
-        
-        return {"sessions": sessions, "total": len(sessions)}
+        return rephrased
         
     except Exception as e:
-        logger.error(f"Failed to get sessions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Failed to rephrase query: {str(e)}. Using original message.")
+        return user_message
 
 if __name__ == "__main__":
     import uvicorn
