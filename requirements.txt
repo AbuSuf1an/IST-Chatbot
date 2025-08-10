@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+psycopg2-binary
+python-dotenv
+langchain-google-genai
+pydantic
+python-multipart
+
+beautifulsoup4==4.12.3
+requests==2.31.0
+lxml==5.1.0
+pandas==2.2.2
+tenacity==8.4.1

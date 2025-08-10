@@ -33,21 +33,15 @@ logger = logging.getLogger(__name__)
 embeddings_model = None
 generative_model = None
 
-# ====================
-# SESSION MEMORY MANAGEMENT
-# ====================
-
-# In-memory storage for conversation history per session
-# Structure: {session_id: {"history": [...], "last_activity": datetime, "message_count": int}}
 session_memory = {}
 
 # Thread lock for safe concurrent access to session memory
 memory_lock = threading.RLock()
 
 # Configuration for session management
-MAX_HISTORY_LENGTH = 10  # Maximum number of exchanges to keep per session
-SESSION_TIMEOUT = 3600   # Session timeout in seconds (1 hour)
-CLEANUP_INTERVAL = 600   # Clean up expired sessions every 10 minutes
+MAX_HISTORY_LENGTH = 10
+SESSION_TIMEOUT = 3600
+CLEANUP_INTERVAL = 600
 last_cleanup_time = time.time()
 
 def generate_session_id(request: Request) -> str:
@@ -264,8 +258,8 @@ def get_embedding(text: str) -> List[float]:
         logger.error(f"Failed to generate embedding: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to generate embedding")
 
-def search_similar_documents(query_embedding: List[float], top_k: int = 5, min_similarity: float = 0.75) -> List[Dict[str, Any]]:
-    """Search for similar documents in the database using cosine similarity."""
+def search_similar_documents(query_embedding: List[float], top_k: int = 10, min_similarity: float = 0.4) -> List[Dict[str, Any]]:
+    """Enhanced single-pass search with lower threshold and higher top_k for better coverage."""
     try:
         conn = psycopg2.connect(**db_config)
         cur = conn.cursor()
@@ -273,7 +267,7 @@ def search_similar_documents(query_embedding: List[float], top_k: int = 5, min_s
         # Convert embedding to string format for PostgreSQL
         embedding_str = '[' + ','.join(map(str, query_embedding)) + ']'
         
-        # Perform similarity search using cosine similarity with minimum similarity filter
+        # Single query with lower threshold to capture more relevant documents
         query = """
         SELECT filename, content, metadata, 
                (embedding <=> %s::vector) as distance,
@@ -290,10 +284,17 @@ def search_similar_documents(query_embedding: List[float], top_k: int = 5, min_s
         documents = []
         for row in results:
             filename, content, metadata, distance, similarity = row
-            # Parse metadata JSON
+            
+            # Handle different metadata formats (string or dict)
             try:
-                metadata_dict = json.loads(metadata) if metadata else {}
-            except json.JSONDecodeError:
+                if isinstance(metadata, dict):
+                    metadata_dict = metadata
+                elif isinstance(metadata, str):
+                    metadata_dict = json.loads(metadata)
+                else:
+                    metadata_dict = {}
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"Failed to parse metadata for {filename}: {str(e)}")
                 metadata_dict = {}
             
             documents.append({
@@ -571,10 +572,7 @@ async def health_check():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest, http_request: Request):
-    """
-    Main chat endpoint with session-based conversation memory.
-    Now maintains conversation context across requests using session identification.
-    """
+    """Main chat endpoint with enhanced single-pass search."""
     try:
         user_message = request.message.strip()
         
@@ -588,7 +586,7 @@ async def chat_endpoint(request: ChatRequest, http_request: Request):
         # Get stored conversation history for this session
         stored_history = get_session_history(session_id)
         
-        # Merge stored history with any frontend history (frontend takes precedence if more complete)
+        # Merge stored history with any frontend history
         merged_history = merge_histories(stored_history, request.history)
         
         logger.debug(f"Using conversation history with {len(merged_history)} exchanges for session {session_id}")
@@ -599,8 +597,8 @@ async def chat_endpoint(request: ChatRequest, http_request: Request):
         # Use the rephrased query for embedding generation
         query_embedding = get_embedding(rephrased_query)
         
-        # Search for similar documents
-        similar_docs = search_similar_documents(query_embedding, top_k=7, min_similarity=0.6)
+        # Enhanced single-pass search with more flexible parameters
+        similar_docs = search_similar_documents(query_embedding, top_k=10, min_similarity=0.4)
         
         # Construct prompt using merged history for context
         prompt = construct_prompt(user_message, similar_docs, merged_history)
@@ -623,7 +621,7 @@ async def chat_endpoint(request: ChatRequest, http_request: Request):
             response=ai_response,
             context_sources=context_sources,
             timestamp=datetime.now().isoformat(),
-            session_id=session_id  # Include session ID for debugging
+            session_id=session_id
         )
         
     except HTTPException:
