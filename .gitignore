@@ -241,6 +241,7 @@ logs/
 # Temporary files
 temp/
 tmp/
+test files/
 
 # Configuration files with sensitive data
 config.ini
