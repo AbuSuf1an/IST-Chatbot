@@ -13,7 +13,7 @@
         placeholderText: 'Ask me about IST...',
         errorMessage: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
         botName: 'IST Assistant',
-        botAvatar: '🎓'
+        botAvatar: '<img src="assets/img/ist-logo.png" alt="IST Logo" style="width:24px;height:24px;border-radius:50%;">'
     };
 
     // Widget state
