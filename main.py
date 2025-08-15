@@ -229,6 +229,7 @@ def construct_enhanced_prompt(original_query: str, enhanced_query: str, context_
 
     INFORMATION SYNTHESIS RULES:
     6. Use ALL available information to provide comprehensive answers
+    7. But give only the most relevant information
     8. If you don't find direct answers, use related information to provide helpful responses
     9. Extract specific details like names, numbers, dates, requirements from the documents
     10. Only say "I don't have that specific information" if NO relevant information exists in any document

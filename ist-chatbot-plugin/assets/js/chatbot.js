@@ -9,10 +9,10 @@
     // Configuration
     const CONFIG = {
         apiUrl: 'http://localhost:8001/api/chat',
-        initialGreeting: 'Hello! Welcome to Institute of Science and Technology. I\'m here to help you with questions about Institute of Science and Technology. How can I help you today?',
+        initialGreeting: 'Hello! Welcome to Institute of Science and Technology. I\'m here to help you with questions about IST. How can I help you today?',
         placeholderText: 'Ask me about IST...',
         errorMessage: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
-        botName: 'IST Chat Assistant',
+        botName: 'IST AI Chatbot',
         botAvatar: '<img src="assets/img/ist-chatbot.png" alt="IST Logo">',
         botAvatarInside: '<img src="assets/img/ist-chatbot.png" alt="IST Logo" style="width:24px;height:24px;border-radius:50%;">',
         // studentAvatar: '<img src="assets/img/person-icon.png" alt="Student Avatar" style="width:24px;height:24px;border-radius:50%;">'
@@ -208,36 +208,35 @@
      */
     async function handleSendMessage() {
         const message = inputField.value.trim();
-        
-        if (!message || isLoading) {
-            return;
-        }
+        if (!message || isLoading) return;
 
         // Add user message to chat
         addMessage('user', message);
-        
-        // Clear input and show loading
+
+        // Clear input
         inputField.value = '';
         inputField.style.height = 'auto';
-        setLoadingState(true);
 
         // Store message in history
         messageHistory.push({ role: 'user', content: message });
 
+        // Now show typing indicator
+        setLoadingState(true);
+
         try {
             // Send message to API
             const response = await sendMessageToAPI(message);
-            
+
             // Add bot response to chat
             addMessage('bot', response.response, response.context_sources);
-            
+
             // Store bot response in history
-            messageHistory.push({ 
-                role: 'bot', 
+            messageHistory.push({
+                role: 'bot',
                 content: response.response,
-                sources: response.context_sources 
+                sources: response.context_sources
             });
-            
+
         } catch (error) {
             console.error('Chatbot error:', error);
             addMessage('bot', CONFIG.errorMessage);
