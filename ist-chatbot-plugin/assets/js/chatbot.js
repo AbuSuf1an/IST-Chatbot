@@ -12,9 +12,9 @@
         initialGreeting: 'Hello! I\'m the IST chatbot assistant. I\'m here to help you with questions about Institute of Science and Technology. What would you like to know?',
         placeholderText: 'Ask me about IST...',
         errorMessage: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
-        botName: 'IST Assistant',
-        botAvatar: '💬',
-        botAvatarInside: '<img src="assets/img/ist-logo.png" alt="IST Logo" style="width:24px;height:24px;border-radius:50%;">'
+        botName: 'IST',
+        botAvatar: '<img src="assets/img/ist-chatbot.png" alt="IST Logo">',
+        botAvatarInside: '<img src="assets/img/ist-chatbot.png" alt="IST Logo" style="width:24px;height:24px;border-radius:50%;">'
     };
 
     // Widget state
