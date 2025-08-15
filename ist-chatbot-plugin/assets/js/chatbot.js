@@ -13,7 +13,8 @@
         placeholderText: 'Ask me about IST...',
         errorMessage: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
         botName: 'IST Assistant',
-        botAvatar: '<img src="assets/img/ist-logo.png" alt="IST Logo" style="width:24px;height:24px;border-radius:50%;">'
+        botAvatar: '💬',
+        botAvatarInside: '<img src="assets/img/ist-logo.png" alt="IST Logo" style="width:24px;height:24px;border-radius:50%;">'
     };
 
     // Widget state
@@ -51,7 +52,7 @@
         widget.innerHTML = `
             <div class="ist-chatbot-header">
                 <h3 class="ist-chatbot-title">
-                    ${CONFIG.botAvatar} ${CONFIG.botName}
+                    ${CONFIG.botAvatarInside} ${CONFIG.botName}
                 </h3>
                 <button class="ist-chatbot-close" aria-label="Close chat">✕</button>
             </div>
@@ -274,7 +275,7 @@
 
         if (sender === 'bot') {
             messageElement.innerHTML = `
-                <div class="ist-chatbot-avatar">${CONFIG.botAvatar}</div>
+                <div class="ist-chatbot-avatar">${CONFIG.botAvatarInside}</div>
                 <div class="ist-chatbot-message-content">
                     ${formatMessage(content)}
                     ${sourceInfo}
@@ -326,7 +327,7 @@
             loadingIndicator = document.createElement('div');
             loadingIndicator.className = 'ist-chatbot-message bot';
             loadingIndicator.innerHTML = `
-                <div class="ist-chatbot-avatar">${CONFIG.botAvatar}</div>
+                <div class="ist-chatbot-avatar">${CONFIG.botAvatarInside}</div>
                 <div class="ist-chatbot-loading active">
                     <div class="ist-chatbot-typing">Typing</div>
                 </div>
