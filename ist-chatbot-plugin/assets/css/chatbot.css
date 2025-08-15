@@ -5,17 +5,17 @@
     position: fixed;
     bottom: 20px;
     right: 20px;
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, #007cba 0%, #005a87 100%);
+    width: 44px;
+    height: 44px;
+    background: linear-gradient(135deg, #e67c1e 0%, #b92c2c 100%);
     border: none;
     border-radius: 50%;
     cursor: pointer;
-    box-shadow: 0 4px 20px rgba(0, 124, 186, 0.3);
+    box-shadow: 0 4px 20px rgba(185, 44, 44, 0.3);
     z-index: 9999;
     transition: all 0.3s ease;
     color: white;
-    font-size: 24px;
+    font-size: 18px; /* Optional: adjust if you use emoji or icon */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -23,11 +23,11 @@
 
 .ist-chatbot-toggle:hover {
     transform: scale(1.1);
-    box-shadow: 0 6px 25px rgba(0, 124, 186, 0.4);
+    box-shadow: 0 6px 25px rgba(185, 44, 44, 0.4);
 }
 
 .ist-chatbot-toggle.active {
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    background: linear-gradient(135deg, #b92c2c 0%, #e67c1e 100%);
 }
 
 .ist-chatbot-toggle img {
@@ -47,11 +47,11 @@
     position: fixed;
     bottom: 90px;
     right: 20px;
-    width: 350px;
-    height: 500px;
-    background: white;
+    width: 300px;
+    height: 450px;
+    background: #fff;
     border-radius: 15px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 10px 40px rgba(185, 44, 44, 0.15);
     z-index: 9998;
     display: none;
     flex-direction: column;
@@ -77,7 +77,7 @@
 
 /* Chatbot Header */
 .ist-chatbot-header {
-    background: linear-gradient(135deg, #007cba 0%, #005a87 100%);
+    background: linear-gradient(135deg, #e67c1e 0%, #b92c2c 100%);
     color: white;
     padding: 15px 20px;
     display: flex;
@@ -92,6 +92,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    color: #222222;
 }
 
 .ist-chatbot-close {
@@ -171,28 +172,28 @@
     max-width: 80%;
     padding: 12px 16px;
     border-radius: 18px;
-    font-size: 14px;
+    font-size: 12px;
     line-height: 1.4;
     word-wrap: break-word;
 }
 
 .ist-chatbot-message.user .ist-chatbot-message-content {
-    background: linear-gradient(135deg, #007cba 0%, #005a87 100%);
+    background: linear-gradient(135deg, #e67c1e 0%, #b92c2c 100%);
     color: white;
     margin-left: 20px;
 }
 
 .ist-chatbot-message.bot .ist-chatbot-message-content {
-    background: white;
-    color: #333;
-    border: 1px solid #e9ecef;
+    background: #fff;
+    color: #222222;
+    border: 1px solid #e67c1e;
     margin-right: 20px;
 }
 
 /* Avatar */
 .ist-chatbot-avatar {
-    width: 32px;
-    height: 32px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -242,17 +243,17 @@
     border: 1px solid #ddd;
     border-radius: 20px;
     padding: 10px 15px;
-    font-size: 14px;
+    font-size: 12px;
     outline: none;
     transition: border-color 0.2s ease;
     resize: none;
-    max-height: 60px;
-    min-height: 40px;
+    max-height: 48px;
+    min-height: 32px;
 }
 
 .ist-chatbot-input:focus {
-    border-color: #007cba;
-    box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.1);
+    border-color: #e67c1e;
+    box-shadow: 0 0 0 2px rgba(230, 124, 30, 0.1);
 }
 
 .ist-chatbot-input::placeholder {
@@ -260,18 +261,18 @@
 }
 
 .ist-chatbot-send {
-    background: linear-gradient(135deg, #007cba 0%, #005a87 100%);
+    background: linear-gradient(135deg, #e67c1e 0%, #b92c2c 100%);
     border: none;
     border-radius: 50%;
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     color: white;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .ist-chatbot-send:hover:not(:disabled) {
@@ -345,6 +346,15 @@
         color: #6c757d;
         transform: scale(1);
     }
+}
+
+/* Status Indicator */
+.ist-chatbot-status {
+    font-size: 11px;
+    color: white;
+    margin-top: 2px;
+    margin-bottom: 2px;
+    font-weight: 500;
 }
 
 /* Responsive Design */

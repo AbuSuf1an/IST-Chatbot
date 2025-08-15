@@ -9,12 +9,13 @@
     // Configuration
     const CONFIG = {
         apiUrl: 'http://localhost:8001/api/chat',
-        initialGreeting: 'Hello! I\'m the IST chatbot assistant. I\'m here to help you with questions about Institute of Science and Technology. What would you like to know?',
+        initialGreeting: 'Hello! Welcome to Institute of Science and Technology. I\'m here to help you with questions about Institute of Science and Technology. How can I help you today?',
         placeholderText: 'Ask me about IST...',
         errorMessage: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
-        botName: 'IST',
+        botName: 'IST Chat Assistant',
         botAvatar: '<img src="assets/img/ist-chatbot.png" alt="IST Logo">',
-        botAvatarInside: '<img src="assets/img/ist-chatbot.png" alt="IST Logo" style="width:24px;height:24px;border-radius:50%;">'
+        botAvatarInside: '<img src="assets/img/ist-chatbot.png" alt="IST Logo" style="width:24px;height:24px;border-radius:50%;">',
+        // studentAvatar: '<img src="assets/img/person-icon.png" alt="Student Avatar" style="width:24px;height:24px;border-radius:50%;">'
     };
 
     // Widget state
@@ -32,6 +33,7 @@
         createWidgetHTML();
         bindEventListeners();
         showInitialGreeting();
+        showBotStatus();
         console.log('IST Chatbot initialized successfully');
     }
 
@@ -54,6 +56,9 @@
                 <h3 class="ist-chatbot-title">
                     ${CONFIG.botAvatarInside} ${CONFIG.botName}
                 </h3>
+                <div class="ist-chatbot-status" id="ist-chatbot-status" style="font-size:8px; color:white; display:none;">
+                    🟢 Online
+                </div>
                 <button class="ist-chatbot-close" aria-label="Close chat">✕</button>
             </div>
             
@@ -176,7 +181,7 @@
         isWidgetOpen = true;
         widget.classList.add('active');
         toggleButton.classList.add('active');
-        toggleButton.innerHTML = '✕';
+        toggleButton.innerHTML = CONFIG.botAvatar;
         inputField.focus();
         scrollToBottom();
     }
@@ -286,7 +291,7 @@
                 <div class="ist-chatbot-message-content">
                     ${formatMessage(content)}
                 </div>
-                <div class="ist-chatbot-avatar">👤</div>
+                <!--<div class="ist-chatbot-avatar">${CONFIG.studentAvatar}</div>-->
             `;
         }
 
@@ -366,6 +371,17 @@
         } catch (error) {
             console.warn('IST Chatbot API is not available:', error);
             return false;
+        }
+    }
+
+    async function showBotStatus() {
+        const statusEl = document.getElementById('ist-chatbot-status');
+        if (!statusEl) return;
+        const ok = await checkAPIStatus();
+        if (ok) {
+            statusEl.style.display = 'block';
+        } else {
+            statusEl.style.display = 'none';
         }
     }
 

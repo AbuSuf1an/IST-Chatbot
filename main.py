@@ -229,7 +229,6 @@ def construct_enhanced_prompt(original_query: str, enhanced_query: str, context_
 
     INFORMATION SYNTHESIS RULES:
     6. Use ALL available information to provide comprehensive answers
-    7. Combine information from multiple documents when relevant
     8. If you don't find direct answers, use related information to provide helpful responses
     9. Extract specific details like names, numbers, dates, requirements from the documents
     10. Only say "I don't have that specific information" if NO relevant information exists in any document
@@ -245,6 +244,8 @@ def construct_enhanced_prompt(original_query: str, enhanced_query: str, context_
     16. Be specific - provide names, numbers, requirements, procedures when available
     17. If information is incomplete, state what is available and acknowledge what might be missing
     18. Use the enhanced query context to understand what the user is really asking about
+    19. Keep answers concise and focused. If possible, summarize information in 3-5 sentences.
+    20. Only include the most relevant details unless the user asks for more.
 
     {conversation_context}{context_text}
     QUERY CONTEXT:
@@ -642,7 +643,7 @@ async def chat_endpoint(request: ChatRequest, http_request: Request):
         # Generalized greeting detection
         if is_greeting(user_message):
             return ChatResponse(
-                response="Hello! How can I assist you with IST information today?",
+                response="Hello! How can I assist you today?",
                 context_sources=[],
                 timestamp=datetime.now().isoformat(),
                 session_id=generate_session_id(http_request)
