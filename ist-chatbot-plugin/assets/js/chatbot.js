@@ -13,8 +13,8 @@
         placeholderText: 'Ask me about IST...',
         errorMessage: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
         botName: 'IST AI Chatbot',
-        botAvatar: '<img src="assets/img/ist-chatbot.png" alt="IST Logo">',
-        botAvatarInside: '<img src="assets/img/ist-chatbot.png" alt="IST Logo" style="width:24px;height:24px;border-radius:50%;">',
+        botAvatar: '<img src="assets/img/ist-chatbot.png" alt="IST Chatbot Logo">',
+        botAvatarInside: '<img src="assets/img/ist-chatbot.png" alt="IST ChatbotLogo" style="width:24px;height:24px;border-radius:50%;">',
         // studentAvatar: '<img src="assets/img/person-icon.png" alt="Student Avatar" style="width:24px;height:24px;border-radius:50%;">'
     };
 
@@ -56,6 +56,7 @@
                 <h3 class="ist-chatbot-title">
                     ${CONFIG.botAvatarInside} ${CONFIG.botName}
                 </h3>
+                <br>
                 <div class="ist-chatbot-status" id="ist-chatbot-status" style="font-size:8px; color:white; display:none;">
                     🟢 Online
                 </div>
@@ -94,7 +95,14 @@
      */
     function bindEventListeners() {
         // Toggle button click
-        toggleButton.addEventListener('click', toggleWidget);
+        toggleButton.addEventListener('click', function() {
+            // Close popup instantly if visible
+            if (window.istChatbotActivePopup && window.istChatbotActivePopup.parentNode) {
+                window.istChatbotActivePopup.parentNode.removeChild(window.istChatbotActivePopup);
+                window.istChatbotActivePopup = null;
+            }
+            toggleWidget();
+        });
 
         // Close button click
         const closeButton = widget.querySelector('.ist-chatbot-close');
@@ -280,11 +288,11 @@
         if (sender === 'bot') {
             messageElement.innerHTML = `
                 <div class="ist-chatbot-avatar">${CONFIG.botAvatarInside}</div>
-                <div class="ist-chatbot-message-content">
-                    ${formatMessage(content)}
-                    ${sourceInfo}
-                </div>
+                <div class="ist-chatbot-message-content"></div>
             `;
+            messagesContainer.appendChild(messageElement);
+            const contentDiv = messageElement.querySelector('.ist-chatbot-message-content');
+            typeMessage(contentDiv, formatMessage(content));
         } else {
             messageElement.innerHTML = `
                 <div class="ist-chatbot-message-content">
@@ -292,6 +300,7 @@
                 </div>
                 <!--<div class="ist-chatbot-avatar">${CONFIG.studentAvatar}</div>-->
             `;
+            messagesContainer.appendChild(messageElement);
         }
 
         messagesContainer.appendChild(messageElement);
@@ -384,12 +393,95 @@
         }
     }
 
+    /**
+     * Show chatbot popup
+     */
+    function showChatbotPopup() {
+        // Try to play sound (may be blocked by browser)
+        const audio = new Audio('assets/sounds/popup.mp3');
+        audio.volume = 0.1;
+        audio.play().catch(() => {
+            // If blocked, play on first user interaction
+            const playOnInteraction = () => {
+                audio.play();
+                document.removeEventListener('click', playOnInteraction);
+            };
+            document.addEventListener('click', playOnInteraction);
+        });
+
+        // Create popup element
+        const popup = document.createElement('div');
+        popup.className = 'ist-chatbot-popup ist-chatbot-popup-animate';
+        popup.textContent = 'Hey, how can I help you?';
+
+        // Position near the toggle button
+        popup.style.position = 'fixed';
+        popup.style.bottom = '80px';
+        popup.style.right = '30px';
+        popup.style.background = 'linear-gradient(135deg, #e67c1e 0%, #b92c2c 100%)';
+        popup.style.color = '#fff';
+        popup.style.padding = '12px 20px';
+        popup.style.borderRadius = '18px';
+        popup.style.boxShadow = '0 4px 16px rgba(185,44,44,0.15)';
+        popup.style.fontSize = '15px';
+        popup.style.zIndex = '10001';
+        popup.style.transition = 'opacity 0.4s';
+
+        // Store reference globally so we can close it later
+        window.istChatbotActivePopup = popup;
+
+        document.body.appendChild(popup);
+
+        // Hide after 4 seconds
+        setTimeout(() => {
+            popup.style.opacity = '0';
+            setTimeout(() => {
+                if (popup.parentNode) popup.parentNode.removeChild(popup);
+                window.istChatbotActivePopup = null;
+            }, 400);
+        }, 4000);
+    }
+
+    /**
+     * Type message with typing effect
+     */
+    function typeMessage(element, text, speed = 20, callback) {
+        let i = 0;
+        element.innerHTML = '';
+        function type() {
+            if (i < text.length) {
+                element.innerHTML += text.charAt(i);
+                i++;
+                setTimeout(type, speed);
+            } else if (callback) {
+                callback();
+            }
+        }
+        type();
+    }
+
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initializeChatbot);
     } else {
         initializeChatbot();
     }
+
+    // Show popup on first user click as well
+    let popupShownOnClick = false;
+    document.addEventListener('click', function onFirstClick(e) {
+        // If the first click is on the chatbot toggle button, do NOT show the popup
+        if (toggleButton && e.target === toggleButton) {
+            popupShownOnClick = true;
+            document.removeEventListener('click', onFirstClick);
+            return;
+        }
+        if (!popupShownOnClick) {
+            showChatbotPopup();
+            popupShownOnClick = true;
+            document.removeEventListener('click', onFirstClick);
+        }
+    });
 
     // Expose public methods (optional)
     window.ISTChatbot = {

@@ -182,7 +182,6 @@ ist-chatbot/
 ├── main.py              # FastAPI application
 ├── ingest.py            # Document ingestion script
 ├── .env                 # Environment variables
-├── test_chatbot.html    # Test interface
 ├── data/                # PDF documents
 │   └── ist-info-from-website.pdf
 └── README.md           # This file

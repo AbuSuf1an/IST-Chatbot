@@ -1,26 +1,17 @@
-#!/usr/bin/env python3
-"""
-Document Ingestion Script for IST Chatbot
-Loads documents from 'data' folder, splits them into chunks, generates embeddings 
-using Google Generative AI, and stores them in PostgreSQL with pgvector extension.
-"""
-
 import os
 import logging
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Any
 import psycopg2
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 
-# LangChain imports
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -56,7 +47,6 @@ class DocumentIngestor:
         self.data_folder = Path("data")
         
     def setup_database(self):
-        """Create the necessary database tables and enable pgvector extension."""
         try:
             conn = psycopg2.connect(**self.db_config)
             cur = conn.cursor()
@@ -77,14 +67,12 @@ class DocumentIngestor:
                 );
             """)
             
-            # Create index on embedding column for faster similarity search
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS documents_embedding_idx 
                 ON documents USING ivfflat (embedding vector_cosine_ops)
                 WITH (lists = 100);
             """)
             
-            # Create additional indexes for better query performance
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS documents_filename_idx 
                 ON documents (filename);
@@ -95,7 +83,6 @@ class DocumentIngestor:
                 ON documents (created_at);
             """)
             
-            # Create index on metadata for JSONB queries
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS documents_metadata_idx 
                 ON documents USING GIN (metadata);

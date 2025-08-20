@@ -1,8 +1,4 @@
-#!/usr/bin/env python3
-"""
-FastAPI Chatbot Backend for IST Chatbot
-Serves as the backend API for the WordPress chatbot integration.
-"""
+#FastAPI Chatbot Backend API for the WordPress chatbot integration.
 
 import os
 import logging
@@ -36,9 +32,9 @@ generative_model = None
 session_memory = {}
 memory_lock = threading.RLock()
 
-MAX_HISTORY_LENGTH = 10
+MAX_HISTORY_LENGTH = 50
 SESSION_TIMEOUT = 3600
-CLEANUP_INTERVAL = 600
+CLEANUP_INTERVAL = 1800
 last_cleanup_time = time.time()
 
 def generate_session_id(request: Request) -> str:
@@ -228,11 +224,11 @@ def construct_enhanced_prompt(original_query: str, enhanced_query: str, context_
     5. When referring to IST, always use first-person language ("our", "we", "us", "our address", etc.) as if you are part of IST.
 
     INFORMATION SYNTHESIS RULES:
-    6. Use ALL available information to provide comprehensive answers
-    7. But give only the most relevant information
+    6. Give exactly the information requested, using the most relevant documents
+    7. Give only the most relevant information, do not include unnecessary details
     8. If you don't find direct answers, use related information to provide helpful responses
     9. Extract specific details like names, numbers, dates, requirements from the documents
-    10. Only say "I don't have that specific information" if NO relevant information exists in any document
+    10. Only say "I don't have that specific information in my knowledge" if NO relevant information exists in ANY document, and ONLY after thoroughly checking ALL available sources for a direct answer. Do NOT mention documentation or sources in your reply.
 
     CONVERSATION HANDLING:
     11. Use BOTH conversation memory and retrieved documentation
@@ -245,9 +241,16 @@ def construct_enhanced_prompt(original_query: str, enhanced_query: str, context_
     16. Be specific - provide names, numbers, requirements, procedures when available
     17. If information is incomplete, state what is available and acknowledge what might be missing
     18. Use the enhanced query context to understand what the user is really asking about
-    19. Keep answers concise and focused. If possible, summarize information in 3-5 sentences.
+    19. Keep answers concise and focused. Summarize information in 1-2 sentences unless user asks for detailed information.
     20. Only include the most relevant details unless the user asks for more.
+    21. If the user asks about a person, reply with their current role/title and department only, unless the user requests more details.
 
+    IMPORTANT:
+    22. If contact information (email, phone) asked and is present in ANY retrieved document, include it in your reply. Do NOT say "not available" if it exists in the provided context.
+    23. Only answer what is specifically asked in the user's question. Do NOT provide additional related information, context, or details unless the user requests it. Avoid combining multiple answers in one reply.
+    24. If the user's question is general knowledge (such as today's date, time, weather, etc.) and the answer is not found in IST documents, reply: "I'm an IST academic assistant and can only answer questions related to IST."
+    25. Never use HTML tags (such as <em>, <strong>, etc.) or placeholder words (such as "what", "something", "topic", etc.) in your reply. Always use clear, natural language. If the user's question is unclear, politely ask for clarification using plain text only.
+    
     {conversation_context}{context_text}
     QUERY CONTEXT:
     {query_context}
@@ -257,10 +260,6 @@ def construct_enhanced_prompt(original_query: str, enhanced_query: str, context_
     return prompt
 
 def extract_topics_from_text(text: str) -> Set[str]:
-    """
-    Extract relevant topics/subjects from text that could be referenced later.
-    """
-    # Define patterns for different types of topics
     topic_patterns = {
         'departments': r'\b(?:Department of |Dept\. of |)(?:Computer Science|CSE|ECE|Electronics|Communication|Engineering|Business Administration|BBA|MBA|ICT|Information Technology)\b',
         'programs': r'\b(?:Bachelor|Master|B\.Sc|M\.Sc|PhD|Undergraduate|Graduate|Diploma)\s+(?:in\s+|of\s+)?(?:Computer Science|CSE|ECE|Electronics|Communication|Engineering|Business Administration|BBA|MBA|ICT|Information Technology)\b',
@@ -280,7 +279,6 @@ def extract_topics_from_text(text: str) -> Set[str]:
             if isinstance(match, str) and len(match.strip()) > 2:
                 topics.add(match.strip())
     
-    # Add some specific IST-related topics
     ist_topics = {
         'CSE': ['computer science', 'cse', 'computer science and engineering'],
         'ECE': ['electronics', 'ece', 'electronics and communication engineering'],
@@ -308,7 +306,6 @@ def resolve_ambiguous_query(user_query: str, history: List[Dict[str, str]]) -> s
     if not history:
         return user_query
     
-    # Check if query contains ambiguous references
     ambiguous_patterns = [
         r'\bthis\s+(?:department|program|course|lab|facility|building|service)\b',
         r'\bthat\s+(?:department|program|course|lab|facility|building|service)\b',
@@ -327,26 +324,23 @@ def resolve_ambiguous_query(user_query: str, history: List[Dict[str, str]]) -> s
     
     logger.info(f"Detected ambiguous reference in: {user_query}")
     
-    # Extract topics from recent conversation history (prioritize most recent)
     recent_topics = set()
     recent_context = ""
     
-    # Look at last 3 exchanges, with most recent having highest priority
     for i, exchange in enumerate(reversed(history[-3:]), 1):
         user_msg = exchange.get('user', exchange.get('message', ''))
         bot_msg = exchange.get('bot', exchange.get('response', ''))
         
-        # Extract topics from both user and bot messages
         if user_msg:
             user_topics = extract_topics_from_text(user_msg)
             recent_topics.update(user_topics)
-            if i == 1:  # Most recent exchange
+            if i == 1:
                 recent_context += f"Recent topic: {user_msg} "
         
         if bot_msg:
             bot_topics = extract_topics_from_text(bot_msg)
             recent_topics.update(bot_topics)
-            if i == 1:  # Most recent exchange
+            if i == 1:
                 recent_context += f"Context: {bot_msg[:100]}... "
     
     if not recent_topics:
@@ -355,41 +349,33 @@ def resolve_ambiguous_query(user_query: str, history: List[Dict[str, str]]) -> s
     
     logger.info(f"Found topics in history: {recent_topics}")
     
-    # Map common ambiguous terms to their likely referents
     resolved_query = user_query
     
-    # Department references
     dept_topics = [t for t in recent_topics if any(keyword in t.lower() for keyword in ['cse', 'computer science', 'ece', 'electronics', 'bba', 'business', 'mba', 'ict'])]
     if dept_topics:
-        primary_dept = dept_topics[0]  # Use most relevant department
+        primary_dept = dept_topics[0]
         
-        # Replace ambiguous department references
         resolved_query = re.sub(r'\bthis\s+department\b', f'the {primary_dept} department', resolved_query, flags=re.IGNORECASE)
         resolved_query = re.sub(r'\bthat\s+department\b', f'the {primary_dept} department', resolved_query, flags=re.IGNORECASE)
         resolved_query = re.sub(r'\bthe\s+department\b(?!\s+(?:of|at|in)\s+\w+)', f'the {primary_dept} department', resolved_query, flags=re.IGNORECASE)
         
-        # Replace program references
         resolved_query = re.sub(r'\bthis\s+program\b', f'the {primary_dept} program', resolved_query, flags=re.IGNORECASE)
         resolved_query = re.sub(r'\bthat\s+program\b', f'the {primary_dept} program', resolved_query, flags=re.IGNORECASE)
     
-    # Course references
     course_topics = [t for t in recent_topics if 'course' in t.lower() or 'subject' in t.lower()]
     if course_topics:
         primary_course = course_topics[0]
         resolved_query = re.sub(r'\bthis\s+course\b', primary_course, resolved_query, flags=re.IGNORECASE)
         resolved_query = re.sub(r'\bthat\s+course\b', primary_course, resolved_query, flags=re.IGNORECASE)
     
-    # Facility references
     facility_topics = [t for t in recent_topics if any(keyword in t.lower() for keyword in ['lab', 'library', 'cafeteria', 'hostel', 'building'])]
     if facility_topics:
         primary_facility = facility_topics[0]
         resolved_query = re.sub(r'\bthis\s+(?:lab|facility|building)\b', primary_facility, resolved_query, flags=re.IGNORECASE)
         resolved_query = re.sub(r'\bthat\s+(?:lab|facility|building)\b', primary_facility, resolved_query, flags=re.IGNORECASE)
     
-    # General "it" references - replace with most relevant topic
     if re.search(r'\bit\b(?!\s+(?:is|was|has|does|can))', resolved_query, re.IGNORECASE):
         if recent_topics:
-            # Use the most specific topic available
             specific_topics = [t for t in recent_topics if len(t.split()) > 1]  # Multi-word topics are usually more specific
             if specific_topics:
                 primary_topic = specific_topics[0]
@@ -398,7 +384,6 @@ def resolve_ambiguous_query(user_query: str, history: List[Dict[str, str]]) -> s
             
             resolved_query = re.sub(r'\bit\b(?!\s+(?:is|was|has|does|can))', primary_topic, resolved_query, flags=re.IGNORECASE)
     
-    # Add IST context if not present
     if 'ist' not in resolved_query.lower() and 'institute of science and technology' not in resolved_query.lower():
         resolved_query += ' at IST'
     
@@ -428,9 +413,8 @@ Paraphrases:"""
         response = generative_model.invoke(variants_prompt).strip()
         variants = [line.strip() for line in response.split('\n') if line.strip() and not line.strip().startswith(('1.', '2.', '-', '*'))]
         
-        # Clean up any remaining formatting
         clean_variants = []
-        for variant in variants[:2]:  # Limit to 2 variants
+        for variant in variants[:2]:
             variant = variant.strip().strip('"\'')
             if variant and variant != query:
                 clean_variants.append(variant)
@@ -447,43 +431,33 @@ def enhanced_rephrase_query(user_message: str, chat_history: List[Dict[str, str]
     Enhanced query rephrasing that first resolves ambiguous references, then rephrases for context.
     """
     try:
-        # First, resolve ambiguous references
         resolved_query = resolve_ambiguous_query(user_message, chat_history)
-        
-        # Then apply the existing rephrasing logic
-        # Simple fallback: just return the resolved query (can be replaced with advanced rephrasing logic)
         return resolved_query
         
     except Exception as e:
         logger.warning(f"Failed to enhance query rephrasing: {str(e)}. Using original message.")
         return user_message
 
-# Enhanced search with fallback for better retrieval
 def enhanced_search_similar_documents(query_embedding: List[float], user_query: str, top_k: int = 10, min_similarity: float = 0.5) -> List[Dict[str, Any]]:
     """
     Enhanced document search with fallback strategies to reduce "I don't know" responses.
     """
-    # Primary search with lowered threshold
     documents = search_similar_documents(query_embedding, top_k, min_similarity)
     
-    # If we have enough relevant documents, return them
     if len(documents) >= 3 and all(doc['similarity_score'] >= 0.6 for doc in documents[:3]):
         return documents
     
     logger.info(f"Primary search returned {len(documents)} documents, trying enhanced retrieval...")
     
-    # Fallback 1: Lower similarity threshold
     if len(documents) < 3:
         fallback_docs = search_similar_documents(query_embedding, top_k=15, min_similarity=0.3)
         logger.info(f"Fallback search with lower threshold found {len(fallback_docs)} documents")
         if len(fallback_docs) > len(documents):
             documents = fallback_docs
     
-    # Fallback 2: Keyword-based search for specific terms
     if len(documents) < 5:
         keyword_docs = keyword_search_fallback(user_query)
         if keyword_docs:
-            # Merge and deduplicate
             existing_filenames = {doc['filename'] for doc in documents}
             for kdoc in keyword_docs:
                 if kdoc['filename'] not in existing_filenames:
@@ -491,7 +465,7 @@ def enhanced_search_similar_documents(query_embedding: List[float], user_query: 
             
             logger.info(f"Added {len(keyword_docs)} documents from keyword search")
     
-    return documents[:top_k]  # Limit to requested number
+    return documents[:top_k]
 
 def multi_query_retrieval(query: str, top_k: int = 10) -> List[Dict[str, Any]]:
     """
@@ -500,7 +474,6 @@ def multi_query_retrieval(query: str, top_k: int = 10) -> List[Dict[str, Any]]:
     all_documents = []
     seen_content = set()
     
-    # Original query
     try:
         original_embedding = get_embedding(query)
         original_docs = enhanced_search_similar_documents(original_embedding, query, top_k)
@@ -515,7 +488,6 @@ def multi_query_retrieval(query: str, top_k: int = 10) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"Original query retrieval failed: {str(e)}")
     
-    # Query variants
     variants = generate_query_variants(query)
     for i, variant in enumerate(variants, 1):
         try:
@@ -535,7 +507,6 @@ def multi_query_retrieval(query: str, top_k: int = 10) -> List[Dict[str, Any]]:
         except Exception as e:
             logger.warning(f"Variant query {i} retrieval failed: {str(e)}")
     
-    # Sort by similarity score and return top results
     all_documents.sort(key=lambda x: x['similarity_score'], reverse=True)
     final_docs = all_documents[:top_k]
     
@@ -550,13 +521,11 @@ def keyword_search_fallback(user_query: str) -> List[Dict[str, Any]]:
         conn = psycopg2.connect(**db_config)
         cur = conn.cursor()
         
-        # Extract keywords from query
         keywords = extract_search_keywords(user_query)
         
         if not keywords:
             return []
         
-        # Build keyword search query
         keyword_conditions = []
         params = []
         
@@ -600,10 +569,6 @@ def keyword_search_fallback(user_query: str) -> List[Dict[str, Any]]:
         return []
 
 def extract_search_keywords(user_query: str) -> List[str]:
-    """
-    Extract relevant keywords from user query for fallback search.
-    """
-    # Important IST-related terms
     important_terms = {
         'faculty', 'teacher', 'professor', 'lecturer', 'instructor', 'head', 'director',
         'cse', 'computer science', 'ece', 'electronics', 'communication', 'bba', 'business', 'mba', 'ict',
@@ -617,12 +582,10 @@ def extract_search_keywords(user_query: str) -> List[str]:
     query_lower = user_query.lower()
     found_keywords = []
     
-    # Find matching terms
     for term in important_terms:
         if term in query_lower:
             found_keywords.append(term)
     
-    # Add names (capitalized words that might be person names)
     words = user_query.split()
     for word in words:
         if word[0].isupper() and len(word) > 3 and word.lower() not in ['what', 'who', 'where', 'when', 'how', 'the', 'and', 'are', 'for', 'ist']:
@@ -634,14 +597,13 @@ def extract_search_keywords(user_query: str) -> List[str]:
 async def health():
     return {"status": "ok"}
 
-# Only keep the enhanced chat endpoint
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest, http_request: Request):
     try:
         user_message = request.message.strip()
         if not user_message:
             raise HTTPException(status_code=400, detail="Message cannot be empty")
-        # Generalized greeting detection
+
         if is_greeting(user_message):
             return ChatResponse(
                 response="Hello! How can I assist you today?",
@@ -652,9 +614,7 @@ async def chat_endpoint(request: ChatRequest, http_request: Request):
         session_id = generate_session_id(http_request)
         stored_history = get_session_history(session_id)
         merged_history = merge_histories(stored_history, request.history)
-        # Enhanced query processing: resolve ambiguous references, then rephrase for context
         enhanced_query = enhanced_rephrase_query(user_message, merged_history)
-        # Multi-query retrieval with enhanced fallback strategies
         similar_docs = multi_query_retrieval(enhanced_query, top_k=10)
         prompt = construct_enhanced_prompt(user_message, enhanced_query, similar_docs, merged_history)
         ai_response = generative_model.invoke(prompt)
@@ -674,17 +634,14 @@ async def chat_endpoint(request: ChatRequest, http_request: Request):
 
 def is_greeting(message: str) -> bool:
     message = message.strip().lower()
-    # Remove common punctuation
     message = re.sub(r'[!,.?]', '', message)
-    # List of greeting/reset keywords
     greetings = {
         "hi", "hello", "hey", "greetings", "good morning", "good afternoon", "good evening",
-        "thanks", "thank you", "ok", "okay", "yo", "sup", "howdy"
+        "thanks", "thank you", "ok", "okay", "yo", "sup", "howdy", "what's up", "how are you", "how's it going",
+        "what's new", "how have you been", "nice to meet you", "pleased to meet you", "good to see you", "long time no see", "welcome"
     }
-    # Exact match or single-word greeting
     if message in greetings:
         return True
-    # Short greeting at the start (e.g. "hi there", "hello bot")
     for greet in greetings:
         if message.startswith(greet) and len(message.split()) <= 3:
             return True
