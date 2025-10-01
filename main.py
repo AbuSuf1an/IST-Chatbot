@@ -6,6 +6,7 @@ import threading
 import time
 from typing import List, Dict, Any, Optional, Set
 import json
+import html
 import psycopg2
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -69,10 +70,12 @@ def update_session_history(session_id: str, user_message: str, bot_response: str
         if session_id not in session_memory:
             session_memory[session_id] = {"history": [], "last_activity": current_datetime, "message_count": 0}
         session_data = session_memory[session_id]
+        detected_person = extract_person_reference(user_message) or extract_person_reference(bot_response)
         session_data["history"].append({
             "user": user_message,
             "bot": bot_response,
-            "timestamp": current_datetime.isoformat()
+            "timestamp": current_datetime.isoformat(),
+            "detected_person": detected_person
         })
         session_data["last_activity"] = current_datetime
         session_data["message_count"] += 1
@@ -251,6 +254,7 @@ def construct_enhanced_prompt(original_query: str, enhanced_query: str, context_
     24. If the user's question is general knowledge (such as today's date, time, weather, etc.) and the answer is not found in IST documents, reply: "I'm an IST academic assistant and can only answer questions related to IST."
     25. Never use HTML tags (such as <em>, <strong>, etc.) or placeholder words (such as "what", "something", "topic", etc.) in your reply. Always use clear, natural language. If the user's question is unclear, politely ask for clarification using plain text only.
     26. When listing multiple items, format them as plain-text bullet points using "- " or numbered lists like "1." on separate lines. Do not use any markup symbols around the items.
+    27. Mirror the language used in the user's most recent message. If they write in Bengali, respond in Bengali; otherwise use English.
     
     {conversation_context}{context_text}
     QUERY CONTEXT:
@@ -259,6 +263,95 @@ def construct_enhanced_prompt(original_query: str, enhanced_query: str, context_
 
     Answer:"""
     return prompt
+
+
+HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
+BENGALI_SCRIPT_PATTERN = re.compile(r"[\u0980-\u09FF]")
+
+
+def sanitize_response_text(text: str) -> str:
+    if not text:
+        return text
+
+    sanitized = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    sanitized = re.sub(r"</p>", "\n\n", sanitized, flags=re.IGNORECASE)
+    sanitized = HTML_TAG_PATTERN.sub("", sanitized)
+    sanitized = html.unescape(sanitized)
+    sanitized = re.sub(r"\s+\n", "\n", sanitized)
+    sanitized = re.sub(r"\n{3,}", "\n\n", sanitized)
+    sanitized = re.sub(r"[ \t]{2,}", " ", sanitized)
+    return sanitized.strip()
+
+
+def needs_translation(text: str) -> bool:
+    if not text:
+        return False
+
+    if BENGALI_SCRIPT_PATTERN.search(text):
+        return True
+
+    total_letters = sum(1 for ch in text if ch.isalpha())
+    if total_letters == 0:
+        return False
+
+    non_ascii_letters = sum(1 for ch in text if ch.isalpha() and not ch.isascii())
+    return non_ascii_letters > 0 and non_ascii_letters >= total_letters * 0.3
+
+
+def translate_to_english(text: str) -> Optional[str]:
+    if generative_model is None:
+        logger.warning("Generative model not initialized; skipping query translation")
+        return None
+
+    try:
+        translation_prompt = (
+            "Translate the following user query into English for information retrieval. "
+            "Transliterate any names or key proper nouns from Bengali or other scripts into the English spellings commonly used by Institute of Science and Technology (IST). "
+            "If the text is already in English, return it unchanged.\n\n"
+            "Original query:\n"
+            f"{text}\n\n"
+            "English:"
+        )
+        translation = generative_model.invoke(translation_prompt)
+        if not translation:
+            return None
+
+        translation_clean = sanitize_response_text(translation)
+        if not translation_clean:
+            return None
+
+        return translation_clean
+    except Exception as exc:
+        logger.warning(f"Query translation failed: {str(exc)}")
+        return None
+
+
+def extract_person_reference(text: str) -> Optional[str]:
+    if not text:
+        return None
+
+    patterns = [
+        r"([A-Za-z][A-Za-z\-'.]+(?:\s+[A-Za-z][A-Za-z\-'.]+)*)\s*(?:madam|sir)\b",
+        r"\b(?:madam|sir)\s*([A-Za-z][A-Za-z\-'.]+(?:\s+[A-Za-z][A-Za-z\-'.]+)*)",
+        r"([A-Za-z][A-Za-z\-'.]+)\s*(?:ma'am|teacher)\b",
+        r"([\u0980-\u09FF][\u0980-\u09FF\s]{0,})\s*(?:ম্যাডাম|স্যার|ম্যাম)",
+        r"(?:ম্যাডাম|স্যার|ম্যাম)\s*([\u0980-\u09FF][\u0980-\u09FF\s]{0,})",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            person = match.group(1).strip()
+            return person
+
+    standalone_names = re.findall(r"\b([A-Za-z][A-Za-z\-'.]{2,})\b", text)
+    for name in standalone_names:
+        lowered = name.lower()
+        if lowered not in {"madam", "sir", "teacher", "email", "contact", "info", "address"}:
+            return name
+
+    return None
+
 
 def extract_topics_from_text(text: str) -> Set[str]:
     topic_patterns = {
@@ -314,8 +407,19 @@ def resolve_ambiguous_query(user_query: str, history: List[Dict[str, str]]) -> s
         r'\bit\b(?!\s+(?:is|was|has|does|can))',  # "it" not followed by verbs
         r'\bthey\b',
         r'\bthem\b',
+        r'\btheir\b',
+        r'\bhis\b',
+        r'\bher\b',
+        r'\bshe\b',
+        r'\bhe\b',
         r'\bhere\b',
-        r'\bthere\b'
+        r'\bthere\b',
+        r'ওনার',
+        r'তার',
+        r'তাঁর',
+        r'তাদের',
+        r'তিনি',
+        r'ওনি'
     ]
     
     has_ambiguous_ref = any(re.search(pattern, user_query, re.IGNORECASE) for pattern in ambiguous_patterns)
@@ -326,32 +430,40 @@ def resolve_ambiguous_query(user_query: str, history: List[Dict[str, str]]) -> s
     logger.info(f"Detected ambiguous reference in: {user_query}")
     
     recent_topics = set()
+    recent_persons: List[str] = []
     recent_context = ""
-    
+
     for i, exchange in enumerate(reversed(history[-3:]), 1):
         user_msg = exchange.get('user', exchange.get('message', ''))
         bot_msg = exchange.get('bot', exchange.get('response', ''))
-        
+
         if user_msg:
             user_topics = extract_topics_from_text(user_msg)
             recent_topics.update(user_topics)
             if i == 1:
                 recent_context += f"Recent topic: {user_msg} "
-        
+            person = exchange.get('detected_person') or extract_person_reference(user_msg)
+            if person and person not in recent_persons:
+                recent_persons.append(person)
+
         if bot_msg:
             bot_topics = extract_topics_from_text(bot_msg)
             recent_topics.update(bot_topics)
             if i == 1:
                 recent_context += f"Context: {bot_msg[:100]}... "
-    
-    if not recent_topics:
+            person = exchange.get('detected_person') or extract_person_reference(bot_msg)
+            if person and person not in recent_persons:
+                recent_persons.append(person)
+
+    if not recent_topics and not recent_persons:
         logger.info("No topics found in recent history")
         return user_query
-    
-    logger.info(f"Found topics in history: {recent_topics}")
-    
+
+    if recent_topics:
+        logger.info(f"Found topics in history: {recent_topics}")
+
     resolved_query = user_query
-    
+
     dept_topics = [t for t in recent_topics if any(keyword in t.lower() for keyword in ['cse', 'computer science', 'ece', 'electronics', 'bba', 'business', 'mba', 'ict'])]
     if dept_topics:
         primary_dept = dept_topics[0]
@@ -374,6 +486,18 @@ def resolve_ambiguous_query(user_query: str, history: List[Dict[str, str]]) -> s
         primary_facility = facility_topics[0]
         resolved_query = re.sub(r'\bthis\s+(?:lab|facility|building)\b', primary_facility, resolved_query, flags=re.IGNORECASE)
         resolved_query = re.sub(r'\bthat\s+(?:lab|facility|building)\b', primary_facility, resolved_query, flags=re.IGNORECASE)
+
+    if recent_persons:
+        primary_person = recent_persons[0]
+        bengali_pronouns = ['ওনার', 'তার', 'তাঁর', 'তাদের', 'ওনি', 'তিনি']
+        for pronoun in bengali_pronouns:
+            resolved_query = re.sub(pronoun, primary_person, resolved_query)
+
+        pronoun_patterns = [r'\bhis\b', r'\bher\b', r'\btheir\b', r'\bthem\b', r'\bshe\b', r'\bhe\b']
+        for pattern in pronoun_patterns:
+            resolved_query = re.sub(pattern, primary_person, resolved_query, flags=re.IGNORECASE)
+
+        resolved_query = re.sub(rf"{primary_person}\s*এর\s*এর", f"{primary_person} এর", resolved_query)
     
     if re.search(r'\bit\b(?!\s+(?:is|was|has|does|can))', resolved_query, re.IGNORECASE):
         if recent_topics:
@@ -411,7 +535,8 @@ Requirements:
 
 Paraphrases:"""
         
-        response = generative_model.invoke(variants_prompt).strip()
+        response_raw = generative_model.invoke(variants_prompt)
+        response = sanitize_response_text(response_raw)
         variants = [line.strip() for line in response.split('\n') if line.strip() and not line.strip().startswith(('1.', '2.', '-', '*'))]
         
         clean_variants = []
@@ -433,6 +558,13 @@ def enhanced_rephrase_query(user_message: str, chat_history: List[Dict[str, str]
     """
     try:
         resolved_query = resolve_ambiguous_query(user_message, chat_history)
+
+        if needs_translation(resolved_query):
+            translated_query = translate_to_english(resolved_query)
+            if translated_query:
+                logger.info(f"Translated query for retrieval: '{resolved_query}' -> '{translated_query}'")
+                return translated_query
+
         return resolved_query
         
     except Exception as e:
@@ -618,7 +750,8 @@ async def chat_endpoint(request: ChatRequest, http_request: Request):
         enhanced_query = enhanced_rephrase_query(user_message, merged_history)
         similar_docs = multi_query_retrieval(enhanced_query, top_k=10)
         prompt = construct_enhanced_prompt(user_message, enhanced_query, similar_docs, merged_history)
-        ai_response = generative_model.invoke(prompt)
+        ai_raw_response = generative_model.invoke(prompt)
+        ai_response = sanitize_response_text(ai_raw_response)
         update_session_history(session_id, user_message, ai_response)
         context_sources = [doc['filename'] for doc in similar_docs] if similar_docs else []
         return ChatResponse(
