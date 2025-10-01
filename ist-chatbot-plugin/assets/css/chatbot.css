@@ -15,7 +15,7 @@
     z-index: 9999;
     transition: all 0.3s ease;
     color: white;
-    font-size: 18px; /* Optional: adjust if you use emoji or icon */
+    font-size: 18px;
     display: flex;
     align-items: center;
     justify-content: center;

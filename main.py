@@ -145,7 +145,7 @@ def initialize_models():
         google_api_key=gemini_api_key
     )
     generative_model = GoogleGenerativeAI(
-        model="models/gemini-1.5-pro",
+        model="models/gemini-2.5-pro",
         google_api_key=gemini_api_key,
         temperature=0.7,
     )
