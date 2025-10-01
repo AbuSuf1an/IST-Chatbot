@@ -285,6 +285,8 @@
             sourceInfo = `<div class="ist-chatbot-sources">Sources: ${uniqueSources.join(', ')}</div>`;
         }
 
+        const formattedContent = formatMessage(content);
+
         if (sender === 'bot') {
             messageElement.innerHTML = `
                 <div class="ist-chatbot-avatar">${CONFIG.botAvatarInside}</div>
@@ -292,15 +294,15 @@
             `;
             messagesContainer.appendChild(messageElement);
             const contentDiv = messageElement.querySelector('.ist-chatbot-message-content');
-            typeMessage(contentDiv, formatMessage(content));
+            typeMessage(contentDiv, formattedContent);
         } else {
             messageElement.innerHTML = `
-                <div class="ist-chatbot-message-content">
-                    ${formatMessage(content)}
-                </div>
+                <div class="ist-chatbot-message-content"></div>
                 <!--<div class="ist-chatbot-avatar">${CONFIG.studentAvatar}</div>-->
             `;
             messagesContainer.appendChild(messageElement);
+            const contentDiv = messageElement.querySelector('.ist-chatbot-message-content');
+            contentDiv.textContent = formattedContent;
         }
 
         messagesContainer.appendChild(messageElement);
@@ -311,10 +313,13 @@
      * Format message content (handle line breaks, links, etc.)
      */
     function formatMessage(content) {
+        if (!content) {
+            return '';
+        }
+
         return content
-            .replace(/\n/g, '<br>')
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em>$1</em>');
+            .replace(/\r\n/g, '\n')
+            .replace(/\t/g, '    ');
     }
 
     /**
@@ -447,10 +452,10 @@
      */
     function typeMessage(element, text, speed = 20, callback) {
         let i = 0;
-        element.innerHTML = '';
+        element.textContent = '';
         function type() {
             if (i < text.length) {
-                element.innerHTML += text.charAt(i);
+                element.textContent += text.charAt(i);
                 i++;
                 setTimeout(type, speed);
             } else if (callback) {

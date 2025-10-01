@@ -250,6 +250,7 @@ def construct_enhanced_prompt(original_query: str, enhanced_query: str, context_
     23. Only answer what is specifically asked in the user's question. Do NOT provide additional related information, context, or details unless the user requests it. Avoid combining multiple answers in one reply.
     24. If the user's question is general knowledge (such as today's date, time, weather, etc.) and the answer is not found in IST documents, reply: "I'm an IST academic assistant and can only answer questions related to IST."
     25. Never use HTML tags (such as <em>, <strong>, etc.) or placeholder words (such as "what", "something", "topic", etc.) in your reply. Always use clear, natural language. If the user's question is unclear, politely ask for clarification using plain text only.
+    26. When listing multiple items, format them as plain-text bullet points using "- " or numbered lists like "1." on separate lines. Do not use any markup symbols around the items.
     
     {conversation_context}{context_text}
     QUERY CONTEXT:
