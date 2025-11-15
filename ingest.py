@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from embedding_utils import get_embedding, batch_embeddings
 
 load_dotenv()
 
@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class DocumentIngestor:    
+class DocumentIngestor:
     def __init__(self):
         self.db_config = {
             'host': os.getenv('DB_HOST', 'localhost'),
@@ -32,10 +32,8 @@ class DocumentIngestor:
         if not self.gemini_api_key:
             raise ValueError("GEMINI_API_KEY environment variable is required")
         
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001",
-            google_api_key=self.gemini_api_key
-        )
+        # Using direct API calls instead of langchain wrapper
+        logger.info("Using direct Gemini API for embeddings with rate limiting")
         
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=3000,
@@ -133,8 +131,9 @@ class DocumentIngestor:
     
     def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         try:
-            embeddings = self.embeddings.embed_documents(texts)
-            logger.info(f"Generated embeddings for {len(texts)} text chunks")
+            logger.info(f"Generating embeddings for {len(texts)} text chunks with rate limiting...")
+            embeddings = batch_embeddings(texts, batch_size=5)  # Process in small batches
+            logger.info(f"Successfully generated embeddings for {len(texts)} text chunks")
             return embeddings
             
         except Exception as e:

@@ -17,7 +17,8 @@ from datetime import datetime
 import hashlib
 import re
 
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, GoogleGenerativeAI
+from langchain_google_genai import GoogleGenerativeAI
+from embedding_utils import get_embedding as get_embedding_direct
 
 load_dotenv()
 
@@ -27,7 +28,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-embeddings_model = None
+# Remove embeddings_model global variable since we're using direct API calls
+generative_model = None
 generative_model = None
 
 session_memory = {}
@@ -139,22 +141,22 @@ class ChatResponse(BaseModel):
     session_id: Optional[str] = None
 
 def initialize_models():
-    global embeddings_model, generative_model
+    global generative_model
     gemini_api_key = os.getenv('GEMINI_API_KEY')
     if not gemini_api_key:
         raise ValueError("GEMINI_API_KEY environment variable is required")
-    embeddings_model = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001",
-        google_api_key=gemini_api_key
-    )
+    
+    # Only initialize the generative model, embeddings use direct API calls
     generative_model = GoogleGenerativeAI(
-        model="models/gemini-2.0-pro-exp",
+        model="models/gemini-2.5-pro",
         google_api_key=gemini_api_key,
         temperature=0.7,
     )
+    logger.info("Models initialized successfully - using direct API for embeddings")
 
 def get_embedding(text: str) -> List[float]:
-    return embeddings_model.embed_query(text)
+    """Use direct API call with rate limiting instead of langchain wrapper"""
+    return get_embedding_direct(text)
 
 def search_similar_documents(query_embedding: List[float], top_k: int = 5, min_similarity: float = 0.75) -> List[Dict[str, Any]]:
     conn = psycopg2.connect(**db_config)
