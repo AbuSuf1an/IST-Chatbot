@@ -147,12 +147,13 @@ def initialize_models():
         raise ValueError("GEMINI_API_KEY environment variable is required")
     
     # Only initialize the generative model, embeddings use direct API calls
+    # Using gemini-2.5-flash for higher free tier limits (1500/day vs 50/day for gemini-2.5-pro)
     generative_model = GoogleGenerativeAI(
-        model="models/gemini-2.5-pro",
+        model="models/gemini-2.5-flash",
         google_api_key=gemini_api_key,
         temperature=0.7,
     )
-    logger.info("Models initialized successfully - using direct API for embeddings")
+    logger.info("Models initialized successfully - using gemini-2.5-flash and direct API for embeddings")
 
 def get_embedding(text: str) -> List[float]:
     """Use direct API call with rate limiting instead of langchain wrapper"""
