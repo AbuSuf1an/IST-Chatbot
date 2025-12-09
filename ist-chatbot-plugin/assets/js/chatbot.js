@@ -12,7 +12,7 @@
         initialGreeting: 'Hello! Welcome to Institute of Science and Technology. I\'m here to help you with questions about IST. How can I help you today?',
         placeholderText: 'Ask me about IST...',
         errorMessage: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.',
-        botName: 'IST AI Chatbot',
+        botName: 'IST-GPT',
         botAvatar: '<img src="assets/img/ist-chatbot.png" alt="IST Chatbot Logo">',
         botAvatarInside: '<img src="assets/img/ist-chatbot.png" alt="IST ChatbotLogo" style="width:24px;height:24px;border-radius:50%;">',
         // studentAvatar: '<img src="assets/img/person-icon.png" alt="Student Avatar" style="width:24px;height:24px;border-radius:50%;">'
