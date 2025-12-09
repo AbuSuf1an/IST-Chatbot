@@ -3,99 +3,277 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IST Chatbot Widget Demo</title>
+    <title>Institute of Science and Technology | IST</title>
     <link rel="stylesheet" href="assets/css/chatbot.css">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            margin: 0;
-            padding: 40px 20px;
-            background: linear-gradient(135deg, #fff7e6 0%, #ffe5d0 100%);
-            min-height: 100vh;
-        }
-        
-        .demo-container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-        }
-        
-        .demo-header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-        
-        .demo-header h1 {
-            color: #b92c2c;
-            margin-bottom: 10px;
-        }
-        
-        .demo-header p {
-            color: #666;
-            font-size: 18px;
-        }
-        
-        .demo-content {
             line-height: 1.6;
             color: #333;
         }
-        
-        .demo-content h2 {
-            color: #e67c1e;
-            margin-top: 30px;
-        }
-        
-        .features-list {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        
-        .features-list ul {
-            margin: 0;
-            padding-left: 20px;
-        }
-        
-        .features-list li {
-            margin-bottom: 8px;
-        }
-        
-        .chatbot-notice {
-            background: linear-gradient(135deg, #e67c1e, #b92c2c);
+
+        /* Header Styles */
+        .header {
+            background: linear-gradient(135deg, #b92c2c 0%, #e67c1e 100%);
             color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            margin: 30px 0;
-        }
-        
-        .chatbot-notice h3 {
-            margin: 0 0 10px 0;
-        }
-        
-        .api-status {
-            margin: 20px 0;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-        
-        .api-status.connected {
-            background: #fff7e6;
-            color: #b92c2c;
-            border: 1px solid #e67c1e;
-        }
-        
-        .api-status.disconnected {
-            background: #ffe5d0;
-            color: #b92c2c;
-            border: 1px solid #e67c1e;
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo img {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+        }
+
+        .logo-text h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .logo-text p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            gap: 30px;
+        }
+
+        .nav-menu a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+
+        .nav-menu a:hover {
+            opacity: 0.8;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(rgba(185, 44, 44, 0.8), rgba(230, 124, 30, 0.8)), url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1200') center/cover;
+            color: white;
+            padding: 100px 0;
+            text-align: center;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .hero h2 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            opacity: 0.95;
+        }
+
+        .cta-button {
+            background: white;
+            color: #b92c2c;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Main Content */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        .section {
+            margin-bottom: 60px;
+        }
+
+        .section h2 {
+            color: #b92c2c;
+            font-size: 2.2rem;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .section h3 {
+            color: #e67c1e;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        /* Grid Layout */
+        .programs-grid, .news-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .card h4 {
+            color: #b92c2c;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .card p {
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .card ul {
+            color: #666;
+            padding-left: 20px;
+        }
+
+        /* Notice Board */
+        .notice-board {
+            background: linear-gradient(135deg, #fff7e6 0%, #ffe5d0 100%);
+            padding: 40px;
+            border-radius: 15px;
+            margin: 40px 0;
+        }
+
+        .notice-item {
+            background: white;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #e67c1e;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .notice-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .notice-date {
+            color: #b92c2c;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .notice-title {
+            color: #333;
+            font-weight: 600;
+            margin: 8px 0;
+        }
+
+        /* Footer */
+        .footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 40px 20px;
+            margin-top: 80px;
+        }
+
+        .footer p {
+            opacity: 0.8;
+        }
+
+        /* API Status */
+        .api-status {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            font-size: 0.9rem;
+            z-index: 999;
+            min-width: 250px;
+        }
+
+        .api-status.connected {
+            border-left: 4px solid #28a745;
+        }
+
+        .api-status.disconnected {
+            border-left: 4px solid #dc3545;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .nav-menu {
+                gap: 20px;
+            }
+
+            .hero h2 {
+                font-size: 2rem;
+            }
+
+            .programs-grid, .news-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .api-status {
+                position: static;
+                margin: 20px;
+            }
+        }
+
+        /* Chatbot Integration Styles */
         .ist-chatbot-toggle {
             position: fixed;
             bottom: 20px;
@@ -103,79 +281,182 @@
             background: linear-gradient(135deg, #e67c1e 0%, #b92c2c 100%);
             border: none;
             border-radius: 50%;
-            width: 55px;
-            height: 55px;
+            width: 60px;
+            height: 60px;
             cursor: pointer;
             outline: none;
             z-index: 1000;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 6px 20px rgba(185, 44, 44, 0.4);
+            transition: all 0.3s ease;
         }
-        
+
+        .ist-chatbot-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 8px 25px rgba(185, 44, 44, 0.6);
+        }
+
         .ist-chatbot-toggle img {
-            width: auto;
-            height: auto;
+            width: 30px;
+            height: 30px;
+        }
+
+        /* Demo Banner */
+        .demo-banner {
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            color: #333;
+            padding: 15px 0;
+            text-align: center;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .demo-banner a {
+            color: #b92c2c;
+            text-decoration: none;
+            font-weight: 700;
         }
     </style>
 </head>
 <body>
-    <!-- <div class="demo-container">
-        <div class="demo-header">
-            <h1>🎓 IST Chatbot Widget Demo</h1>
-            <p>Interactive AI assistant for Institute of Science and Technology</p>
-            <div id="api-status" class="api-status">
-                <span>Checking API connection...</span>
+    <!-- Demo Banner -->
+    <div class="demo-banner">
+        🤖 This is a DEMO showcasing IST's AI Chatbot Assistant - Try clicking the chat button! 
+        <a href="https://ist.edu.bd" target="_blank">Visit Real IST Website →</a>
+    </div>
+
+    <!-- API Status -->
+    <div id="api-status" class="api-status">
+        <span>🔄 Checking chatbot API connection...</span>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <img src="https://ist.edu.bd/wp-content/uploads/elementor/thumbs/IST_logo_small-pgwfg6hbe67ua0cktiolz21gbt9o7dz9s2miewh91c.png" alt="IST Logo" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2250%22 height=%2250%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23b92c2c%22/><text x=%2250%22 y=%2255%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2240%22 font-weight=%22bold%22>IST</text></svg>'">
+                <div class="logo-text">
+                    <h1>Institute of Science and Technology</h1>
+                    <p>A center of excellence for education</p>
+                </div>
             </div>
-        </div>
-        
-        <div class="demo-content">
-            <h2>About the IST Chatbot</h2>
-            <p>
-                This chatbot widget provides instant assistance to students, faculty, and staff of 
-                Institute of Science and Technology. It uses advanced AI to answer questions about courses, 
-                admissions, campus facilities, and other IST-related topics.
-            </p>
-            
-            <div class="features-list">
-                <h3>Key Features:</h3>
-                <ul>
-                    <li>✨ Contextual responses based on IST documentation</li>
-                    <li>🔍 Semantic search through IST knowledge base</li>
-                    <li>💬 Natural language conversation interface</li>
-                    <li>📱 Responsive design for all devices</li>
-                    <li>🎯 Source attribution for transparency</li>
-                    <li>⚡ Fast response times</li>
+            <nav>
+                <ul class="nav-menu">
+                    <li><a href="#home">Home</a></li>
+                    <li><a href="#programs">Programs</a></li>
+                    <li><a href="#admissions">Admissions</a></li>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#contact">Contact</a></li>
                 </ul>
-            </div>
-            
-            <h2>How to Use</h2>
-            <p>
-                Click the chatbot button in the bottom-right corner to start a conversation. 
-                You can ask questions like:
-            </p>
-            <ul>
-                <li>"What is IST?"</li>
-                <li>"What courses does IST offer?"</li>
-                <li>"How do I apply to IST?"</li>
-                <li>"Tell me about IST facilities"</li>
-                <li>"What are the admission requirements?"</li>
-            </ul>
-            
-            <div class="chatbot-notice">
-                <h3>🚀 Try the Chatbot Now!</h3>
-                <p>Look for the chatbot button in the bottom-right corner of your screen</p>
-            </div>
-            
-            <h2>Technical Implementation</h2>
-            <p>
-                The chatbot is powered by Google's Gemini AI model and uses a PostgreSQL database 
-                with vector embeddings for semantic search. It's implemented as a FastAPI backend 
-                with a JavaScript frontend widget that can be easily integrated into any website.
-            </p>
+            </nav>
         </div>
-    </div> -->
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="hero-content">
+            <h2>Welcome to IST</h2>
+            <p>Institute of Science and Technology - Celebrating 33 years of academic excellence and innovation in Computer Science, Engineering, and Business Administration.</p>
+            <button class="cta-button">Explore Our Programs</button>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Academic Programs Section -->
+        <section class="section" id="programs">
+            <h2>Academic Programs</h2>
+            <div class="programs-grid">
+                <div class="card">
+                    <h4>🖥️ Computer Science & Engineering (CSE)</h4>
+                    <p>Master the art of programming, software development, and cutting-edge technologies.</p>
+                    <ul>
+                        <li>B.Sc (Hons.) in CSE</li>
+                        <li>M.Sc in CSE (MCSE)</li>
+                        <li>Diploma in Computer Engineering</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>⚡ Electronics & Communication Engineering (ECE)</h4>
+                    <p>Explore the world of electronics, telecommunications, and digital systems.</p>
+                    <ul>
+                        <li>B.Sc (Hons.) in ECE</li>
+                        <li>Diploma in Electrical Engineering</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h4>📊 Business Administration (BBA)</h4>
+                    <p>Develop leadership skills and business acumen for the corporate world.</p>
+                    <ul>
+                        <li>Bachelor of Business Administration (BBA)</li>
+                        <li>Master of Business Administration (MBA)</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Latest Notices Section -->
+        <section class="section">
+            <h2>Latest Notices</h2>
+            <div class="notice-board">
+                <div class="notice-item">
+                    <div class="notice-date">December 4, 2025</div>
+                    <div class="notice-title">জাতীয় বিশ্ববিদ্যালয়ের পরীক্ষা কেন্দ্র নির্ধারিত হওয়ায় সকল একাডেমিক ক্লাস বন্ধের নোটিশ</div>
+                </div>
+                <div class="notice-item">
+                    <div class="notice-date">December 2, 2025</div>
+                    <div class="notice-title">২০২৩ সালের সিএসই ৪র্থ বর্ষ ৮ম সেমিস্টার ব্যবহারিক ও প্রজেক্ট পরীক্ষার নোটিশ</div>
+                </div>
+                <div class="notice-item">
+                    <div class="notice-date">November 24, 2025</div>
+                    <div class="notice-title">২০২৪ সালের বিবিএ পার্ট-৩, ৫ম সেমিস্টার পরীক্ষার ফরম ফিলাপের বিজ্ঞপ্তি</div>
+                </div>
+                <div class="notice-item">
+                    <div class="notice-date">November 24, 2025</div>
+                    <div class="notice-title">২০২৪ সালের সিএসই পার্ট-৩, ৫ম সেমিস্টার পরীক্ষার ফরম ফিলাপের সংশোধিত বিজ্ঞপ্তি</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- News & Events Section -->
+        <section class="section">
+            <h2>News & Events</h2>
+            <div class="news-grid">
+                <div class="card">
+                    <h4>🏆 Excellent Achievement by CSE 29th Batch</h4>
+                    <p>Congratulations to our fabulous 29th batch students for their outstanding performance. We are counting on you to bring us more glories.</p>
+                </div>
+                <div class="card">
+                    <h4>🎓 Outstanding Results from ECE 16th Batch</h4>
+                    <p>The ECE 16th batch has shown excellent results in their recent examinations. Keep up the excellent work!</p>
+                </div>
+                <div class="card">
+                    <h4>🌟 Stupendous Achievement by CSE 28th Batch</h4>
+                    <p>Flawless performance from our CSE 28th batch students. Excellent work and keep going towards more success.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section class="section" id="about">
+            <h2>About IST</h2>
+            <div class="card">
+                <p>Institute of Science and Technology (IST), affiliated with National University, Bangladesh, is celebrating its 33rd anniversary this year. Over the last decade, IST has earned local and global reputation by creating highly qualified Computer Experts, Scientists and Business Experts of highest potential.</p>
+                
+                <p>Our objective is to empower the younger generation and make a contribution to the nation to help uplift the progress in business, technology and also to formulate policy for overall development of the country. We pledge to ensure the quality of life by ensuring the quality of education.</p>
+                
+                <p>The Institute is regulated by a strong Governing Body consisting of eminent Professors of Dhaka University, Subject Experts, within the rules and regulations of National University of Bangladesh.</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2025 Institute of Science and Technology. All Rights Reserved.</p>
+        <p>Created with ♥ by ISTians | <strong>🤖 AI Chatbot Demo Active</strong></p>
+    </footer>
 
     <!-- Chatbot JavaScript -->
     <script src="assets/js/chatbot.js"></script>
@@ -191,8 +472,9 @@
                     const data = await response.json();
                     statusElement.className = 'api-status connected';
                     statusElement.innerHTML = `
-                        <strong>✅ API Connected</strong><br>
-                        Status: ${data.status} | Documents: ${data.documents_count}
+                        <strong>✅ AI Chatbot Online</strong><br>
+                        Status: ${data.status} | Knowledge Base: ${data.documents_count} documents<br>
+                        <small>💬 Click the chat button to ask about IST!</small>
                     `;
                 } else {
                     throw new Error('API responded with error');
@@ -200,8 +482,9 @@
             } catch (error) {
                 statusElement.className = 'api-status disconnected';
                 statusElement.innerHTML = `
-                    <strong>❌ API Disconnected</strong><br>
-                    Make sure the FastAPI server is running on port 8001
+                    <strong>❌ AI Chatbot Offline</strong><br>
+                    Chatbot service is currently unavailable<br>
+                    <small>Please start the FastAPI server on port 8001</small>
                 `;
             }
         }
@@ -211,6 +494,26 @@
         
         // Check API status every 30 seconds
         setInterval(checkAPIStatus, 30000);
+
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+
+        // Demo announcement after page load
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (window.IST_Chatbot && typeof window.IST_Chatbot.showDemo === 'function') {
+                    console.log('🤖 IST AI Chatbot is ready! Click the chat button to test it.');
+                }
+            }, 3000);
+        });
     </script>
 </body>
 </html>
